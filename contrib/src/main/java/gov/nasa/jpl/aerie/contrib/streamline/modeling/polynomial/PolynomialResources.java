@@ -77,6 +77,37 @@ public final class PolynomialResources {
     return () -> cell.get().dynamics;
   }
 
+  /**
+   * Integrates {@param integrand}, but clamps the value.
+   * Clamping is done by adjusting the integrand,
+   * so that values change immediately when rate reverses.
+   * @param integrand
+   * @param startingValue
+   * @param minimum
+   * @param maximum
+   * @return
+   */
+  public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, double minimum, double maximum) {
+    CellResource<Polynomial> resultCopy = cellResource(polynomial(startingValue));
+    Resource<Discrete<Boolean>> integralIsInBounds = DiscreteResourceMonad.map(
+        lessThan(resultCopy, maximum),
+        greaterThan(resultCopy, minimum),
+        Boolean::logicalAnd);
+    var effectiveIntegrand = map(
+        integrand, integralIsInBounds,
+        (integrand$, inBounds) -> inBounds.extract() ? integrand$ : polynomial(0));
+    var result = integrate(effectiveIntegrand, startingValue);
+    // TODO: Use an efficient repeating task here
+    spawn(() -> {
+      while (true) {
+        waitUntil(dynamicsChange(result));
+        var resultDynamics = result.getDynamics();
+        resultCopy.emit(ignored -> resultDynamics);
+      }
+    });
+    return result;
+  }
+
   public static Resource<Polynomial> differentiate(Resource<Polynomial> p) {
     return map(p, Polynomial::derivative);
   }
