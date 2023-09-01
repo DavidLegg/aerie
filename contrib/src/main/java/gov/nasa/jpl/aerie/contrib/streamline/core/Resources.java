@@ -45,7 +45,9 @@ public final class Resources {
 
       return positive == haveChanged
           ? Optional.of(atEarliest)
-          : currentDynamics.expiry().value().filter(atLatest::noShorterThan);
+          : positive
+            ? currentDynamics.expiry().value().filter(atLatest::noShorterThan)
+            : Optional.empty();
     };
   }
 
@@ -105,6 +107,9 @@ public final class Resources {
    *   through the derivation every time they are sampled.
    * </p>
    */
+  // REVIEW: Suggestion from Jonathan Castello to remove this method
+  // in favor of allowing resources to report expiry information directly.
+  // This would be cleaner and potentially more performant.
   public static <D extends Dynamics<?, D>> Resource<D> signalling(Resource<D> resource) {
     var cell = allocate(discrete(Unit.UNIT));
     // TODO: Implement an efficient repeating task and use it here.
