@@ -53,6 +53,16 @@ public final class QueryContext implements Context {
   }
 
   @Override
+  public void pushScope() {
+    // Do nothing.
+  }
+
+  @Override
+  public void popScope() {
+    // Do nothing.
+  }
+
+  @Override
   public void delay(final Duration duration) {
     throw new IllegalStateException("Cannot yield in a query-only context");
   }
