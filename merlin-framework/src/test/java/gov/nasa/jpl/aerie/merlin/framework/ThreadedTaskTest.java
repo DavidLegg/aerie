@@ -31,6 +31,16 @@ public final class ThreadedTaskTest {
       public void spawn(final TaskFactory<?> task) {
         throw new UnsupportedOperationException();
       }
+
+      @Override
+      public void pushScope() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void popScope() {
+        throw new UnsupportedOperationException();
+      }
     };
 
     final var pool = Executors.newCachedThreadPool();
