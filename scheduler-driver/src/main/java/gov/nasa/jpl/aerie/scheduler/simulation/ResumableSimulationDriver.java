@@ -259,7 +259,7 @@ public class ResumableSimulationDriver<Model> implements AutoCloseable {
       if (!plannedDirectiveToTask.isEmpty() && plannedDirectiveToTask
           .values()
           .stream()
-          .allMatch(engine::isSpanComplete)) {
+          .allMatch($ -> engine.getSpan($).isComplete())) {
         allTaskFinished = true;
       }
 
