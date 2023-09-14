@@ -1,7 +1,9 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
@@ -9,6 +11,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Unit;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareOperations;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareResources;
+import gov.nasa.jpl.aerie.merlin.framework.ModelActions;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
@@ -91,14 +94,31 @@ public final class PolynomialResources {
    * @return
    */
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, double minimum, double maximum) {
-    CellResource<Polynomial> resultCopy = cellResource(polynomial(startingValue));
-    Resource<Discrete<Boolean>> integralIsInBounds = signalling(DiscreteResourceMonad.map(
-        lessThanOrEquals(resultCopy, maximum),
-        greaterThanOrEquals(resultCopy, minimum),
-        Boolean::logicalAnd));
+    CellResource<Polynomial> resultCopy = CellResource.cellResource(integrand.getDynamics().data().integral(startingValue));
+    var lte = lessThanOrEquals(resultCopy, maximum);
+    var gte = greaterThanOrEquals(resultCopy, minimum);
     var effectiveIntegrand = map(
-        integrand, integralIsInBounds,
-        (integrand$, inBounds) -> inBounds.extract() ? integrand$ : polynomial(0));
+      integrand, gte, lte,
+      (integrand$, gte$, lte$) -> {
+        if (!lte$.extract() && integrand$.lessThanOrEquals(0.0).data().extract()) {
+          // we have exceeded the upper limit BUT we have a negative or 0 rate/integrand
+          // SHOULD WORK FOR ANY DEGREE INTEGRAND - IF DERIVATIVE IS NEGATIVE IT WILL DECREASE, SO
+          //      DERIVATIVE BECOMING POSITIVE ONLY HAS CONSEQUENCE IF WE GO BACK TO HITTING CLAMP LIMIT
+          //      WHICH WOULD TRIGGER THIS CHECK AGAIN AS WE HIT GTE.
+          return integrand$;
+        }
+        else if (!gte$.extract() && integrand$.greaterThanOrEquals(0.0).data().extract()) {
+          // we have fallen under the lower limit BUT we have a positive or 0 rate/integrand
+          return integrand$;
+        }
+        else if (lte$.extract() && gte$.extract()) {
+          return integrand$;
+        }
+        else {
+          return Polynomial.polynomial(0.0);
+        }
+      }
+    );
     var result = integrate(effectiveIntegrand, startingValue);
     // TODO: Use an efficient repeating task here
     spawn(() -> {
