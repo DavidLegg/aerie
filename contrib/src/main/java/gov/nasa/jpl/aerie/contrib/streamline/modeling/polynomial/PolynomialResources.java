@@ -76,7 +76,7 @@ public final class PolynomialResources {
       while (true) {
         waitUntil(dynamicsChange(p));
         var p$ = p.getDynamics().data();
-        System.out.println(p$.toString() + " --> " + currentTime());
+//        System.out.println(p$.toString() + " --> " + currentTime());
         cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
       }
     });
