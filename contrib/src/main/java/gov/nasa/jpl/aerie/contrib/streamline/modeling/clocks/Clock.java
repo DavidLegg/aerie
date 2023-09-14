@@ -3,14 +3,13 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
-public interface Clock extends Dynamics<Duration, Clock> {
+public record Clock(Duration extract) implements Dynamics<Duration, Clock> {
   @Override
-  default Clock step(Duration t) {
-    final Duration newTime = extract().plus(t);
-    return () -> newTime;
+  public Clock step(Duration t) {
+    return clock(extract().plus(t));
   }
 
   static Clock clock(Duration startingTime) {
-    return () -> startingTime;
+    return new Clock(startingTime);
   }
 }

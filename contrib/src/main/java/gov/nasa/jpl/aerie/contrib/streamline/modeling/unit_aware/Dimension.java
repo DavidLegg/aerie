@@ -73,7 +73,7 @@ public sealed interface Dimension {
   private static Dimension create(Map<BaseDimension, Rational> basePowers) {
     var normalizedBasePowers = new HashMap<BaseDimension, Rational>();
     for (var entry : basePowers.entrySet()) {
-      if (entry.getValue().equals(Rational.ZERO)) {
+      if (!entry.getValue().equals(Rational.ZERO)) {
         normalizedBasePowers.put(entry.getKey(), entry.getValue());
       }
     }

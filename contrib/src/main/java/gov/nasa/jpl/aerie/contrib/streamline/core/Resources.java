@@ -18,6 +18,19 @@ import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.d
 public final class Resources {
   private Resources() {}
 
+  /**
+   * Ensure that Resources are initialized.
+   *
+   * <p>
+   *   This method needs to be called during simulation initialization.
+   *   This method is idempotent; calling it multiple times is the same as calling it once.
+   * </p>
+   */
+  // TODO: Consider adding this somewhere in the Registrar class, since that'll be used during initialization.
+  public static void init() {
+    currentTime();
+  }
+
   private static CellResource<ClockDynamics> CLOCK = CellResource.cellResource(new ClockDynamics(ZERO));
   public static Duration currentTime() {
     try {
