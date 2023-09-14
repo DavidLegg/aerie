@@ -94,6 +94,14 @@ public final class PolynomialResources {
    * @return
    */
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, double minimum, double maximum) {
+    if (maximum <= minimum) {
+      throw new IllegalArgumentException("Maximum (" + maximum + ") is less than/equal to minimum (" + minimum + ")");
+    }
+    if (startingValue > maximum || startingValue < minimum) {
+      throw new IllegalArgumentException("Starting value (" + startingValue + ") out of bounds: [" + minimum + "," + maximum + "]");
+    }
+
+
     CellResource<Polynomial> resultCopy = CellResource.cellResource(integrand.getDynamics().data().integral(startingValue));
     var lte = lessThanOrEquals(resultCopy, maximum);
     var gte = greaterThanOrEquals(resultCopy, minimum);
@@ -132,6 +140,10 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
+    if (startingValue > maximum.getDynamics().data().extract() || startingValue < minimum.getDynamics().data().extract()) {
+      throw new IllegalArgumentException("Starting value (" + startingValue + ") out of initial bounds: [" + minimum.getDynamics().data().extract() + "," + maximum.getDynamics().data().extract() + "]");
+    }
+
     CellResource<Polynomial> resultCopy = CellResource.cellResource(integrand.getDynamics().data().integral(startingValue));
     var lte = lessThanOrEquals(resultCopy, maximum);
     var gte = greaterThanOrEquals(resultCopy, minimum);
@@ -165,6 +177,17 @@ public final class PolynomialResources {
         var resultDynamics = result.getDynamics();
         resultCopy.emit(ignored -> resultDynamics);
       }
+    });
+
+    // check, if minimum and maximum are changing values or have changed, that min < max still (else err out)
+    spawn(() -> {
+      while (true) {
+        if (lessThanOrEquals(maximum, minimum).getDynamics().data().extract()) {
+          throw new IllegalArgumentException("Maximum (" + maximum.getDynamics().data() + " -> " + maximum.getDynamics().data().extract() + ") is less than/equal to minimum (" + minimum.getDynamics().data().extract() + " -> " + minimum.getDynamics().data().extract() + ")");
+        }
+        waitUntil(dynamicsChange(lessThanOrEquals(maximum, minimum)));
+        throw new IllegalArgumentException("Maximum (" + maximum.getDynamics().data() + " -> " + maximum.getDynamics().data().extract() + ") is less than/equal to minimum (" + minimum.getDynamics().data().extract() + " -> " + minimum.getDynamics().data().extract() + ")");
+        }
     });
     return result;
   }
