@@ -2,6 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import org.apache.commons.math3.analysis.solvers.LaguerreSolver;
@@ -37,7 +38,26 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     int n = coefficients.length;
     while (n > 1 && coefficients[n - 1] == 0) --n;
     final double[] newCoefficients = Arrays.copyOf(coefficients, n);
-    return () -> newCoefficients;
+//    return //() -> newCoefficients;
+    return new Polynomial() {
+      @Override
+      public double[] coefficients() {
+        return newCoefficients;
+      }
+
+      public boolean equals(Object p) {
+        return p instanceof Polynomial && Arrays.equals(((Polynomial) p).coefficients(), this.coefficients());
+      }
+
+      @Override
+      public String toString() {
+        String res = "Polynomial(" + this.degree() + "): ";
+        for (double c : this.coefficients()) {
+          res += c + ", ";
+        }
+        return res;
+      }
+    };
   }
 
   @Override
@@ -151,10 +171,10 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
 
   private Expiring<Discrete<Boolean>> compare(DoublePredicate predicate, double threshold) {
     final boolean currentValue = predicate.test(extract());
-    final var expiry = expiry(findFuturePreImage(threshold)
+    final var expiry = this.isConstant() ? Expiry.NEVER : expiry(findFuturePreImage(threshold)
         .flatMap(t -> IntStream.rangeClosed(-MAX_RANGE_FOR_ROOT_SEARCH, MAX_RANGE_FOR_ROOT_SEARCH)
             .mapToObj(i -> t.plus(EPSILON.times(i))))
-        .filter(t -> predicate.test(evaluate(t)) ^ currentValue)
+        .filter(t -> (predicate.test(evaluate(t)) ^ currentValue) && t.isPositive())
         .findFirst());
     return expiring(discrete(currentValue), expiry);
   }
@@ -175,6 +195,10 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return compare(x -> x <= threshold, threshold);
   }
 
+  default boolean equals(Polynomial p) {
+    return Arrays.equals(p.coefficients(), this.coefficients());
+  }
+
   /**
    * Finds all occasions in the future when this function will reach the target value.
    */
@@ -187,5 +211,14 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
                  .filter(t -> t >= 0)
                  .sorted()
                  .map(t -> Duration.roundNearest(t, SECOND));
+  }
+
+  /**
+   * Get the nth coefficient.
+   * @param n the n.
+   * @return the nth coefficient
+   */
+  default double getCoefficient(int n) {
+    return n >= coefficients().length ? 0.0 : coefficients()[n];
   }
 }

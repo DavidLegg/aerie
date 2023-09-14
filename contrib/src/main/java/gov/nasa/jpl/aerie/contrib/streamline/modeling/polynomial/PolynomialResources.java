@@ -13,8 +13,10 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.shift;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
@@ -71,6 +73,7 @@ public final class PolynomialResources {
       while (true) {
         waitUntil(dynamicsChange(p));
         var p$ = p.getDynamics().data();
+        System.out.println(p$.toString() + " --> " + currentTime());
         cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
       }
     });
@@ -89,10 +92,10 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, double minimum, double maximum) {
     CellResource<Polynomial> resultCopy = cellResource(polynomial(startingValue));
-    Resource<Discrete<Boolean>> integralIsInBounds = DiscreteResourceMonad.map(
-        lessThan(resultCopy, maximum),
-        greaterThan(resultCopy, minimum),
-        Boolean::logicalAnd);
+    Resource<Discrete<Boolean>> integralIsInBounds = signalling(DiscreteResourceMonad.map(
+        lessThanOrEquals(resultCopy, maximum),
+        greaterThanOrEquals(resultCopy, minimum),
+        Boolean::logicalAnd));
     var effectiveIntegrand = map(
         integrand, integralIsInBounds,
         (integrand$, inBounds) -> inBounds.extract() ? integrand$ : polynomial(0));

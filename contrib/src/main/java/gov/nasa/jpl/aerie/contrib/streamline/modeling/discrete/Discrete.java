@@ -13,6 +13,17 @@ public interface Discrete<V> extends Dynamics<V, Discrete<V>> {
   }
 
   static <V> Discrete<V> discrete(V value) {
-    return () -> value;
+    return new Discrete<V>() {
+
+      @Override
+      public boolean equals(Object o) {
+        return o instanceof Discrete<?> && ((Discrete<?>) o).extract().equals(this.extract());
+      }
+
+      @Override
+      public V extract() {
+        return value;
+      }
+    };
   }
 }

@@ -87,6 +87,8 @@ public final class Demo {
       set(enumSwitch, OnOff.OFF);
       toggle(boolSwitch);
     });
+
+    set(boolSwitch, false);
   }
 
 
