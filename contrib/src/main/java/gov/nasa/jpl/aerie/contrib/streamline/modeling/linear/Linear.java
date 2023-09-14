@@ -3,6 +3,8 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.linear;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
+import java.util.Objects;
+
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
 // TODO: Implement better support for going to/from Linear
@@ -25,6 +27,18 @@ public interface Linear extends Dynamics<Double, Linear> {
       @Override
       public Double extract() {
         return value;
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(value, rate);
+      }
+
+      @Override
+      public boolean equals(final Object obj) {
+        return obj instanceof Linear l &&
+               Objects.equals(extract(), l.extract()) &&
+               rate() == l.rate();
       }
     };
   }

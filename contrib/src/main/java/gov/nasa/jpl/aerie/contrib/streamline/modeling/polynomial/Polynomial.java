@@ -9,6 +9,7 @@ import org.apache.commons.math3.complex.Complex;
 
 import java.util.Arrays;
 import java.util.function.DoublePredicate;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -37,7 +38,22 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     int n = coefficients.length;
     while (n > 1 && coefficients[n - 1] == 0) --n;
     final double[] newCoefficients = Arrays.copyOf(coefficients, n);
-    return () -> newCoefficients;
+    return new Polynomial() {
+      @Override
+      public double[] coefficients() {
+        return newCoefficients;
+      }
+
+      @Override
+      public int hashCode() {
+        return Arrays.hashCode(coefficients());
+      }
+
+      @Override
+      public boolean equals(final Object obj) {
+        return obj instanceof Polynomial p && Arrays.equals(coefficients(), p.coefficients());
+      }
+    };
   }
 
   @Override

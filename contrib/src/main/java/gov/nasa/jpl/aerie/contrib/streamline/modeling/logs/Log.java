@@ -25,6 +25,9 @@ public interface Log {
       public int size() {
         return z;
       }
+
+      // WARNING! This class needs an equals/hashCode to work properly.
+      // Consider re-thinking the log type, or removing it altogether.
     };
   }
 

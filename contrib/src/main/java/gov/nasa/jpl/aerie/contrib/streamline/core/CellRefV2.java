@@ -41,7 +41,7 @@ public final class CellRefV2 {
    * </p>
    */
   public static <D extends Dynamics<?, D>> CellRef<DynamicsEffect<D>, Cell<D>> allocate(Expiring<D> initialDynamics) {
-    return allocate(initialDynamics, noncommutingEffects());
+    return allocate(initialDynamics, autoEffects());
   }
 
   /**
