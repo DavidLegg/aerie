@@ -203,6 +203,9 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
    * Finds all occasions in the future when this function will reach the target value.
    */
   private Stream<Duration> findFuturePreImage(double target) {
+    if (Math.abs(target) == Double.POSITIVE_INFINITY) {
+      return Stream.empty();
+    }
     final double[] shiftedCoefficients = add(polynomial(-target)).coefficients();
     final Complex[] solutions = new LaguerreSolver().solveAllComplex(shiftedCoefficients, 0);
     return Arrays.stream(solutions)
