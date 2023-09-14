@@ -20,61 +20,45 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 import static org.apache.commons.math3.analysis.polynomials.PolynomialsUtils.shift;
 
-public interface Polynomial extends Dynamics<Double, Polynomial> {
+public record Polynomial(double[] coefficients) implements Dynamics<Double, Polynomial> {
   /**
    * Maximum imaginary component allowed in a root to be considered "real" when performing root-finding.
    * Should be a very small number to avoid spurious roots.
    */
-  double ROOT_FINDING_IMAGINARY_COMPONENT_TOLERANCE = 1e-12;
+  private static final double ROOT_FINDING_IMAGINARY_COMPONENT_TOLERANCE = 1e-12;
+
   /**
    * Maximum number of time steps to search in either direction around near-roots
    * to find the corresponding discretized transition point.
    */
-  int MAX_RANGE_FOR_ROOT_SEARCH = 2;
+  private static final int MAX_RANGE_FOR_ROOT_SEARCH = 2;
 
-  double[] coefficients();
-
-  static Polynomial polynomial(double... coefficients) {
+  public static Polynomial polynomial(double... coefficients) {
     int n = coefficients.length;
     while (n > 1 && coefficients[n - 1] == 0) --n;
     final double[] newCoefficients = Arrays.copyOf(coefficients, n);
-    return new Polynomial() {
-      @Override
-      public double[] coefficients() {
-        return newCoefficients;
-      }
-
-      @Override
-      public int hashCode() {
-        return Arrays.hashCode(coefficients());
-      }
-
-      @Override
-      public boolean equals(final Object obj) {
-        return obj instanceof Polynomial p && Arrays.equals(coefficients(), p.coefficients());
-      }
-    };
+    return new Polynomial(newCoefficients);
   }
 
   @Override
-  default Double extract() {
+  public Double extract() {
     return coefficients()[0];
   }
 
   @Override
-  default Polynomial step(Duration t) {
+  public Polynomial step(Duration t) {
     return polynomial(shift(coefficients(), t.ratioOver(SECOND)));
   }
 
-  default int degree() {
+  public int degree() {
     return coefficients().length - 1;
   }
 
-  default boolean isConstant() {
+  public boolean isConstant() {
     return degree() == 0;
   }
 
-  default Polynomial add(Polynomial other) {
+  public Polynomial add(Polynomial other) {
     final double[] coefficients = coefficients();
     final double[] otherCoefficients = other.coefficients();
     final int minLength = Math.min(coefficients.length, otherCoefficients.length);
@@ -91,11 +75,11 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return polynomial(newCoefficients);
   }
 
-  default Polynomial subtract(Polynomial other) {
+  public Polynomial subtract(Polynomial other) {
     return add(other.multiply(polynomial(-1)));
   }
 
-  default Polynomial multiply(Polynomial other) {
+  public Polynomial multiply(Polynomial other) {
     final double[] coefficients = coefficients();
     final double[] otherCoefficients = other.coefficients();
     // Length = degree + 1, so
@@ -118,7 +102,7 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return polynomial(newCoefficients);
   }
 
-  default Polynomial divide(double scalar) {
+  public Polynomial divide(double scalar) {
     final double[] coefficients = coefficients();
     final double[] newCoefficients = new double[coefficients.length];
     for (int i = 0; i < coefficients.length; ++i) {
@@ -127,7 +111,7 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return polynomial(newCoefficients);
   }
 
-  default Polynomial integral(double startingValue) {
+  public Polynomial integral(double startingValue) {
     final double[] coefficients = coefficients();
     final double[] newCoefficients = new double[coefficients.length + 1];
     newCoefficients[0] = startingValue;
@@ -137,7 +121,7 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return polynomial(newCoefficients);
   }
 
-  default Polynomial derivative() {
+  public Polynomial derivative() {
     final double[] coefficients = coefficients();
     final double[] newCoefficients = new double[coefficients.length - 1];
     for (int i = 1; i < coefficients.length; ++i) {
@@ -146,11 +130,11 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return polynomial(newCoefficients);
   }
 
-  default double evaluate(Duration t) {
+  public double evaluate(Duration t) {
     return evaluate(t.ratioOver(SECOND));
   }
 
-  default double evaluate(double x) {
+  public double evaluate(double x) {
     // Horner's method of polynomial evaluation:
     // Transforms a_0 + a_1 x + a_2 x^2 + ... + a_n x^n
     // into a_0 + x (a_1 + x (a_2 + ... x ( a_n ) ... ))
@@ -175,19 +159,19 @@ public interface Polynomial extends Dynamics<Double, Polynomial> {
     return expiring(discrete(currentValue), expiry);
   }
 
-  default Expiring<Discrete<Boolean>> greaterThan(double threshold) {
+  public Expiring<Discrete<Boolean>> greaterThan(double threshold) {
     return compare(x -> x > threshold, threshold);
   }
 
-  default Expiring<Discrete<Boolean>> greaterThanOrEquals(double threshold) {
+  public Expiring<Discrete<Boolean>> greaterThanOrEquals(double threshold) {
     return compare(x -> x >= threshold, threshold);
   }
 
-  default Expiring<Discrete<Boolean>> lessThan(double threshold) {
+  public Expiring<Discrete<Boolean>> lessThan(double threshold) {
     return compare(x -> x < threshold, threshold);
   }
 
-  default Expiring<Discrete<Boolean>> lessThanOrEquals(double threshold) {
+  public Expiring<Discrete<Boolean>> lessThanOrEquals(double threshold) {
     return compare(x -> x <= threshold, threshold);
   }
 

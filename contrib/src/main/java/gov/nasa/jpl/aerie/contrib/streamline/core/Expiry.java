@@ -5,33 +5,31 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-public interface Expiry {
-  Optional<Duration> value();
+public record Expiry(Optional<Duration> value) {
+  public static Expiry NEVER = expiry(Optional.empty());
 
-  Expiry NEVER = Optional::empty;
-
-  static Expiry at(Duration t) {
+  public static Expiry at(Duration t) {
     return expiry(Optional.of(t));
   }
 
-  static Expiry expiry(Optional<Duration> value) {
-    return () -> value;
+  public static Expiry expiry(Optional<Duration> value) {
+    return new Expiry(value);
   }
 
-  default Expiry or(Expiry other) {
+  public Expiry or(Expiry other) {
     return expiry(
         Stream.concat(value().stream(), other.value().stream()).reduce(Duration::min));
   }
 
-  default Expiry minus(Duration t) {
+  public Expiry minus(Duration t) {
     return expiry(value().map(v -> v.minus(t)));
   }
 
-  default boolean isNever() {
+  public boolean isNever() {
     return value().isEmpty();
   }
 
-  default int compareTo(Expiry other) {
+  public int compareTo(Expiry other) {
     if (this.isNever()) {
       if (other.isNever()) {
         return 0;
@@ -47,19 +45,19 @@ public interface Expiry {
     }
   }
 
-  default boolean shorterThan(Expiry other) {
+  public boolean shorterThan(Expiry other) {
     return this.compareTo(other) < 0;
   }
 
-  default boolean noShorterThan(Expiry other) {
+  public boolean noShorterThan(Expiry other) {
     return this.compareTo(other) >= 0;
   }
 
-  default boolean longerThan(Expiry other) {
+  public boolean longerThan(Expiry other) {
     return this.compareTo(other) > 0;
   }
 
-  default boolean noLongerThan(Expiry other) {
+  public boolean noLongerThan(Expiry other) {
     return this.compareTo(other) <= 0;
   }
 }
