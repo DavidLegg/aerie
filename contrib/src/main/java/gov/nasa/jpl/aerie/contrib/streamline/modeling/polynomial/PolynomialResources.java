@@ -128,26 +128,10 @@ public final class PolynomialResources {
       }
     );
 
-    // TODO: FIGURE OUT HOW TO MAKE STARTINGVALUE CHANGE TO REFLECT NEW VALUE OF EFFECTIVEINTEGRAND
-    // IDEA IS THAT IF THE UPPER BOUNDARY CHANGES, AND THE CURRENT VALUE OF THE INTEGRAL IS HIGHER,
-    // IT SHOULD GET FORCED DOWN THEN (IF THE RATE IS TOO HIGH) RATE LIMITED
-    // CURRENTLY, IT JUST PLATEAUS BUT AT A VALUE THATS OUT OF BOUNDS.
-    var cell = allocate(p.getDynamics().data().integral(startingValue.getDynamics().data().extract()));
     // TODO: Use an efficient repeating task here
+    var result = integrate(effectiveIntegrand, startingValue);
     spawn(() -> {
       while (true) {
-        waitUntil(dynamicsChange(p).or(dynamicsChange(startingValue)));
-        var p$ = p.getDynamics().data();
-//        System.out.println(p$.toString() + " --> " + currentTime());
-        cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
-      }
-    });
-    return () -> cell.get().dynamics;
-
-    // TODO: Use an efficient repeating task here
-    spawn(() -> {
-      while (true) {
-        var result = integrate(effectiveIntegrand, startingValue);
         waitUntil(dynamicsChange(result));
         var resultDynamics = result.getDynamics();
         resultCopy.emit(ignored -> resultDynamics);
@@ -160,7 +144,6 @@ public final class PolynomialResources {
     // the starting value can be modified at runtime, in the case of changing dynamics, like min and max. To ensure the
     //    starting value fits (else, force it down), we need it to be a resource, that gets reevaluated with integrand.
     CellResource<Polynomial> wrappedStartingValue = CellResource.cellResource(Polynomial.polynomial(startingValue));
-    var result = PolynomialResources.constant(startingValue);
 
     if (startingValue > maximum.getDynamics().data().extract() || startingValue < minimum.getDynamics().data().extract()) {
       throw new IllegalArgumentException("Starting value (" + startingValue + ") out of initial bounds: [" + minimum.getDynamics().data().extract() + "," + maximum.getDynamics().data().extract() + "]");
@@ -193,7 +176,6 @@ public final class PolynomialResources {
     );
     // there might be cases that arise where startingValue is less than maximum later on, as maximum could change
     //    in a resource. Consider changing capacity in an UnallocatedBucket in a datamodel.
-    final Resource<Polynomial> finalResult = result;
     var effectiveStartingValue = map(
       gte, lte,
       (gte$, lte$) -> {
@@ -207,17 +189,33 @@ public final class PolynomialResources {
           return Polynomial.polynomial(min);
         }
         else {
-          return Polynomial.polynomial(finalResult.getDynamics().data().extract());
+          return Polynomial.polynomial(startingValue);//finalResult.getDynamics().data().extract());
         }
       }
     );
-    result = integrate(effectiveIntegrand, effectiveStartingValue);
+
+    // TODO: FIGURE OUT HOW TO MAKE STARTINGVALUE CHANGE TO REFLECT NEW VALUE OF EFFECTIVEINTEGRAND
+    // IDEA IS THAT IF THE UPPER BOUNDARY CHANGES, AND THE CURRENT VALUE OF THE INTEGRAL IS HIGHER,
+    // IT SHOULD GET FORCED DOWN THEN (IF THE RATE IS TOO HIGH) RATE LIMITED
+    // CURRENTLY, IT JUST PLATEAUS BUT AT A VALUE THATS OUT OF BOUNDS.
+//    var cell = allocate(p.getDynamics().data().integral(startingValue.getDynamics().data().extract()));
+//    // TODO: Use an efficient repeating task here
+//    spawn(() -> {
+//      while (true) {
+//        waitUntil(dynamicsChange(p).or(dynamicsChange(startingValue)));
+//        var p$ = p.getDynamics().data();
+////        System.out.println(p$.toString() + " --> " + currentTime());
+//        cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
+//      }
+//    });
+//    return () -> cell.get().dynamics;
+
+    var result = integrate(integrand, startingValue);
     // TODO: Use an efficient repeating task here
-    final Resource<Polynomial> finalResult1 = result;
     spawn(() -> {
       while (true) {
-        waitUntil(dynamicsChange(finalResult1));
-        var resultDynamics = finalResult1.getDynamics();
+        waitUntil(dynamicsChange(result));
+        var resultDynamics = result.getDynamics();
         resultCopy.emit(ignored -> resultDynamics);
       }
     });
