@@ -2,6 +2,8 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAware;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareResources;
 import gov.nasa.jpl.aerie.merlin.framework.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -16,6 +18,14 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.unitAware;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Quantities.add;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Quantities.quantity;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Quantities.subtract;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.StandardUnits.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.StandardUnits.BIT;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.StandardUnits.METER;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareOperations.simplify;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.MINUTE;
@@ -175,5 +185,56 @@ class DiscreteEffectsTest {
     assertEquals(initialValue, currentValue(nonconsumable));
   }
 
-  // TODO: Unit-aware effects - to be tested once the unit-aware framework itself is tested
+  UnitAware<CellResource<Discrete<Double>>> settableDataVolume = unitAware(cellResource(discrete(10.0)), BIT);
+
+  @Test
+  void unit_aware_set_converts_to_resource_unit() {
+    set(settableDataVolume, quantity(2, BYTE));
+    assertEquals(quantity(16.0, BIT), UnitAwareResources.currentValue(simplify(settableDataVolume)));
+  }
+
+  @Test
+  void unit_aware_set_throws_exception_if_wrong_dimension_is_used() {
+    assertThrows(IllegalArgumentException.class, () -> set(settableDataVolume, quantity(2, METER)));
+  }
+
+  UnitAware<CellResource<Discrete<Double>>> consumableDataVolume = unitAware(cellResource(discrete(10.0)), BIT);
+
+  @Test
+  void unit_aware_consume_converts_to_resource_unit() {
+    var initialDataVolume = UnitAwareResources.currentValue(simplify(consumableDataVolume));
+    var oneByte = quantity(1, BYTE);
+    consume(consumableDataVolume, oneByte);
+    assertEquals(subtract(initialDataVolume, oneByte), UnitAwareResources.currentValue(simplify(consumableDataVolume)));
+  }
+
+  @Test
+  void unit_aware_consume_throws_exception_if_wrong_dimension_is_used() {
+    assertThrows(IllegalArgumentException.class, () -> consume(consumableDataVolume, quantity(1, METER)));
+  }
+
+  @Test
+  void unit_aware_restore_converts_to_resource_unit() {
+    var initialDataVolume = UnitAwareResources.currentValue(simplify(consumableDataVolume));
+    var oneByte = quantity(1, BYTE);
+    restore(consumableDataVolume, oneByte);
+    assertEquals(add(initialDataVolume, oneByte), UnitAwareResources.currentValue(simplify(consumableDataVolume)));
+  }
+
+  @Test
+  void unit_aware_restore_throws_exception_if_wrong_dimension_is_used() {
+    assertThrows(IllegalArgumentException.class, () -> restore(consumableDataVolume, quantity(1, METER)));
+  }
+
+  UnitAware<CellResource<Discrete<Double>>> nonconsumableDataVolume = unitAware(cellResource(discrete(10.0)), BIT);
+
+  @Test
+  void unit_aware_using_converts_to_resource_unit() {
+    var initialDataVolume = UnitAwareResources.currentValue(simplify(nonconsumableDataVolume));
+    var oneByte = quantity(1, BYTE);
+    using(nonconsumableDataVolume, oneByte, () -> {
+      assertEquals(subtract(initialDataVolume, oneByte), UnitAwareResources.currentValue(simplify(nonconsumableDataVolume)));
+    });
+    assertEquals(initialDataVolume, UnitAwareResources.currentValue(simplify(nonconsumableDataVolume)));
+  }
 }

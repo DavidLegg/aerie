@@ -39,6 +39,7 @@ public interface UnitAware<T> {
           return this;
         }
         if (!unit.dimension.equals(desiredUnit.dimension)) {
+          // TODO: Should this be its own kind of exception? A UnitConversionException or DimensionMismatchException?
           throw new IllegalArgumentException("Cannot convert %s to desired unit %s due to dimension mismatch (%s vs %s)."
                 .formatted(unit, desiredUnit, unit.dimension, desiredUnit.dimension));
         }

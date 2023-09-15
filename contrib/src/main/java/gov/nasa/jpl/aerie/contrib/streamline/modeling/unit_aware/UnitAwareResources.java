@@ -5,11 +5,14 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Quantities.quantity;
 
 public final class UnitAwareResources {
   private UnitAwareResources() {}
@@ -43,5 +46,9 @@ public final class UnitAwareResources {
 
   public static <A> BiFunction<Resource<A>, Double, Resource<A>> extend(BiFunction<A, Double, A> scaling) {
     return extend(scaling, ResourceMonad::map);
+  }
+
+  public static <D extends Dynamics<Double, D>> UnitAware<Double> currentValue(UnitAware<Resource<D>> resource) {
+    return quantity(Resources.currentValue(resource.value()), resource.unit());
   }
 }
