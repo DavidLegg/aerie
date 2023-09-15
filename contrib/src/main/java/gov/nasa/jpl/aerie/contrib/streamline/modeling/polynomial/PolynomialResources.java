@@ -14,12 +14,16 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareResour
 import gov.nasa.jpl.aerie.merlin.framework.ModelActions;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
+import java.util.Arrays;
+
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.shift;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.when;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
@@ -76,7 +80,6 @@ public final class PolynomialResources {
       while (true) {
         waitUntil(dynamicsChange(p));
         var p$ = p.getDynamics().data();
-//        System.out.println(p$.toString() + " --> " + currentTime());
         cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
       }
     });
@@ -140,6 +143,10 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
+    return clampedIntegrate1(integrand, startingValue, minimum, maximum);
+  }
+
+  public static Resource<Polynomial> clampedIntegrate1(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
     if (startingValue > maximum.getDynamics().data().extract() || startingValue < minimum.getDynamics().data().extract()) {
       throw new IllegalArgumentException("Starting value (" + startingValue + ") out of initial bounds: [" + minimum.getDynamics().data().extract() + "," + maximum.getDynamics().data().extract() + "]");
     }
@@ -190,6 +197,41 @@ public final class PolynomialResources {
         }
     });
     return result;
+  }
+
+  public static Resource<Polynomial> clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
+    var cell = cellResource(integrand.getDynamics().data().integral(startingValue));
+    var empty = lessThanOrEquals(cell, minimum);
+    var full = greaterThanOrEquals(cell, maximum);
+    var effectiveIntegrand = bind(
+        empty, empty$ -> bind(full, full$ -> empty$.extract()
+            ? max(integrand, differentiate(minimum))
+            : full$.extract()
+                ? min(integrand, differentiate(maximum))
+                : integrand));
+    // TODO: Use an efficient repeating task here
+    whenever(() -> dynamicsChange(effectiveIntegrand), () -> {
+      var integrandDynamics = effectiveIntegrand.getDynamics().data();
+      cell.emit(effect(integralDynamics -> integrandDynamics.integral(integralDynamics.extract())));
+    });
+    // HACK - correction for discretely changing bounds / overshoots due to discretization
+    whenever(when(greaterThan(cell, maximum)), () -> {
+      double maxValue = currentValue(maximum);
+      cell.emit(effect(integralDynamics -> {
+        double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
+        coefficients[0] = maxValue;
+        return polynomial(coefficients);
+      }));
+    });
+    whenever(when(lessThan(cell, minimum)), () -> {
+      double minValue = currentValue(minimum);
+      cell.emit(effect(integralDynamics -> {
+        double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
+        coefficients[0] = minValue;
+        return polynomial(coefficients);
+      }));
+    });
+    return cell;
   }
 
   public static Resource<Polynomial> differentiate(Resource<Polynomial> p) {

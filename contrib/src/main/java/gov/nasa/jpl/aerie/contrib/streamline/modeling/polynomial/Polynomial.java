@@ -209,4 +209,24 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   public double getCoefficient(int n) {
     return n >= coefficients().length ? 0.0 : coefficients()[n];
   }
+
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    Polynomial that = (Polynomial) o;
+    return Arrays.equals(coefficients, that.coefficients);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(coefficients);
+  }
+
+  @Override
+  public String toString() {
+    return "Polynomial{" +
+           "coefficients=" + Arrays.toString(coefficients) +
+           '}';
+  }
 }
