@@ -15,7 +15,6 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResour
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.clamp;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.clampedIntegrate;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.MILLISECONDS;
@@ -23,12 +22,11 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.junit.jupiter.api.Assertions.*;
 
-// TODO: account for under/overflow in tests below.
-
 @Nested
 @ExtendWith(MerlinExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
 class ClampedIntegralTest {
+
   public ClampedIntegralTest(final Registrar registrar) {
     Resources.init();
   }
@@ -134,8 +132,7 @@ class ClampedIntegralTest {
     assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
   }
 
-  // TODO: Debug this test
-  // @Test
+  @Test
   void constant_bounds_clamp_identically() {
     set(lowerBound, polynomial(10));
     set(upperBound, polynomial(10));
@@ -145,8 +142,7 @@ class ClampedIntegralTest {
     assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
   }
 
-  // TODO: Debug this test
-  // @Test
+  @Test
   void non_constant_bounds_clamp_identically() {
     set(lowerBound, polynomial(10, -1, 2));
     set(upperBound, polynomial(10, -1, 2));
@@ -156,8 +152,8 @@ class ClampedIntegralTest {
     assertEquals(polynomial(11, 3, 2), clampedIntegral.getDynamics().data());
     delay(9, SECONDS);
     // New dynamics = 2x^2 - x + 10 stepped by 10 seconds:
-    //   = 2(x + 10)^2 - (x + 10) + 10 = 2x^2 + 400x + 200 - x - 10 + 10 = 2x^2 + 399x + 200
-    assertEquals(polynomial(200, 399, 2), clampedIntegral.getDynamics().data());
+    //   = 2(x + 10)^2 - (x + 10) + 10 = 2x^2 + 40x + 200 - x - 10 + 10 = 2x^2 + 39x + 200
+    assertEquals(polynomial(200, 39, 2), clampedIntegral.getDynamics().data());
   }
 
   @Test

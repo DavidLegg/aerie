@@ -35,7 +35,7 @@ public final class Resources {
   public static Duration currentTime() {
     try {
       return currentValue(CLOCK);
-    } catch (EmptyDynamicCellException e) {
+    } catch (EmptyDynamicCellException | IllegalArgumentException e) {
       // If we're running unit tests, several simulations can happen without reloading the Resources class.
       // In that case, we'll have discarded the clock cell we were using, and get the above exception.
       // REVIEW: Is there a cleaner way to make sure this cell gets (re-)initialized?

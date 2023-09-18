@@ -67,17 +67,16 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> integrate(Resource<Polynomial> p, double startingValue) {
-    return integrationCell(p, startingValue);
-  }
-
-  private static CellResource<Polynomial> integrationCell(Resource<Polynomial> p, double startingValue) {
-    var cell = cellResource(p.getDynamics().data().integral(startingValue));
+    var cell = allocate(p.getDynamics().data().integral(startingValue));
     // TODO: Use an efficient repeating task here
-    whenever(() -> dynamicsChange(p), () -> {
-      var p$ = p.getDynamics().data();
-      cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
+    spawn(() -> {
+      while (true) {
+        waitUntil(dynamicsChange(p));
+        var p$ = p.getDynamics().data();
+        cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
+      }
     });
-    return cell;
+    return () -> cell.get().dynamics;
   }
 
   /**
@@ -137,7 +136,7 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    return clampedIntegrate2(integrand, startingValue, minimum, maximum).integral;
+    return clampedIntegrate2(integrand, startingValue, minimum, maximum);
   }
 
   public static Resource<Polynomial> clampedIntegrate1(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
@@ -193,7 +192,7 @@ public final class PolynomialResources {
     return result;
   }
 
-  public static ClampedIntegrateReturn clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
+  public static Resource<Polynomial> clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
     whenever(lessThan(maximum, minimum), () -> {
       throw new IllegalStateException(
           "Inverted bounds for clamped integral: maximum %f < minimum %f"
@@ -204,27 +203,17 @@ public final class PolynomialResources {
     // Bootstrap integral by initially using a constant "integral" resource:
     var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, constant(clampedStartingValue));
     // This way, the cell is initialized to the correct dynamics.
-    CellResource<Polynomial> cell = cellResource(initialEffectiveIntegrand.getDynamics().data().integral(clampedStartingValue));
-    Resource<Polynomial> effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
+    var cell = cellResource(initialEffectiveIntegrand.getDynamics().data().integral(clampedStartingValue));
+    var effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
     whenever(() -> dynamicsChange(effectiveIntegrand), () -> {
       var integrandDynamics = effectiveIntegrand.getDynamics().data();
       cell.emit(effect(integralDynamics -> integrandDynamics.integral(integralDynamics.extract())));
     });
-    var underflow = integrationCell(max(subtract(effectiveIntegrand, integrand), constant(0)), 0);
-    var overflow = integrationCell(max(subtract(integrand, effectiveIntegrand), constant(0)), 0);
     // correction for discretely changing bounds / overshoots due to discretization of time
-    whenever(greaterThan(cell, maximum), () -> {
-      addToValue(overflow, currentValue(cell) - currentValue(maximum));
-      setValue(cell, currentValue(maximum));
-    });
-    whenever(lessThan(cell, minimum), () -> {
-      addToValue(underflow, currentValue(minimum) - currentValue(cell));
-      setValue(cell, currentValue(minimum));
-    });
-    return new ClampedIntegrateReturn(cell, underflow, overflow);
+    whenever(greaterThan(cell, maximum), () -> setValue(cell, currentValue(maximum)));
+    whenever(lessThan(cell, minimum), () -> setValue(cell, currentValue(minimum)));
+    return cell;
   }
-
-  public record ClampedIntegrateReturn(Resource<Polynomial> integral, Resource<Polynomial> underflow, Resource<Polynomial> overflow) {}
 
   private static Resource<Polynomial> clampedEffectiveIntegrand(
       Resource<Polynomial> integrand,
@@ -235,25 +224,22 @@ public final class PolynomialResources {
     var empty = lessThanOrEquals(integral, minimum);
     var full = greaterThanOrEquals(integral, maximum);
     return bind(
-        empty, empty$ -> bind(full, full$ -> empty$.extract()
-            ? max(integrand, differentiate(minimum))
-            : full$.extract()
-                ? min(integrand, differentiate(maximum))
-                : integrand));
+        empty, empty$ -> bind(full, full$ -> {
+          Resource<Polynomial> result = integrand;
+          if (empty$.extract()) {
+            result = max(result, differentiate(minimum));
+          }
+          if (full$.extract()) {
+            result = min(result, differentiate(maximum));
+          }
+          return result;
+        }));
   }
 
   private static void setValue(CellResource<Polynomial> cell, double value) {
     cell.emit(effect(integralDynamics -> {
       double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
       coefficients[0] = value;
-      return polynomial(coefficients);
-    }));
-  }
-
-  private static void addToValue(CellResource<Polynomial> cell, double delta) {
-    cell.emit(effect(integralDynamics -> {
-      double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
-      coefficients[0] += delta;
       return polynomial(coefficients);
     }));
   }
