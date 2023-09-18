@@ -67,16 +67,17 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> integrate(Resource<Polynomial> p, double startingValue) {
-    var cell = allocate(p.getDynamics().data().integral(startingValue));
+    return integrationCell(p, startingValue);
+  }
+
+  private static CellResource<Polynomial> integrationCell(Resource<Polynomial> p, double startingValue) {
+    var cell = cellResource(p.getDynamics().data().integral(startingValue));
     // TODO: Use an efficient repeating task here
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(p));
-        var p$ = p.getDynamics().data();
-        cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
-      }
+    whenever(() -> dynamicsChange(p), () -> {
+      var p$ = p.getDynamics().data();
+      cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
     });
-    return () -> cell.get().dynamics;
+    return cell;
   }
 
   /**
@@ -136,7 +137,7 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    return clampedIntegrate2(integrand, startingValue, minimum, maximum);
+    return clampedIntegrate2(integrand, startingValue, minimum, maximum).integral;
   }
 
   public static Resource<Polynomial> clampedIntegrate1(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
@@ -192,7 +193,7 @@ public final class PolynomialResources {
     return result;
   }
 
-  public static Resource<Polynomial> clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
+  public static ClampedIntegrateReturn clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
     whenever(lessThan(maximum, minimum), () -> {
       throw new IllegalStateException(
           "Inverted bounds for clamped integral: maximum %f < minimum %f"
@@ -209,11 +210,21 @@ public final class PolynomialResources {
       var integrandDynamics = effectiveIntegrand.getDynamics().data();
       cell.emit(effect(integralDynamics -> integrandDynamics.integral(integralDynamics.extract())));
     });
+    var underflow = integrationCell(max(subtract(effectiveIntegrand, integrand), constant(0)), 0);
+    var overflow = integrationCell(max(subtract(integrand, effectiveIntegrand), constant(0)), 0);
     // correction for discretely changing bounds / overshoots due to discretization of time
-    whenever(greaterThan(cell, maximum), () -> setValue(cell, currentValue(maximum)));
-    whenever(lessThan(cell, minimum), () -> setValue(cell, currentValue(minimum)));
-    return cell;
+    whenever(greaterThan(cell, maximum), () -> {
+      addToValue(overflow, currentValue(cell) - currentValue(maximum));
+      setValue(cell, currentValue(maximum));
+    });
+    whenever(lessThan(cell, minimum), () -> {
+      addToValue(underflow, currentValue(minimum) - currentValue(cell));
+      setValue(cell, currentValue(minimum));
+    });
+    return new ClampedIntegrateReturn(cell, underflow, overflow);
   }
+
+  public record ClampedIntegrateReturn(Resource<Polynomial> integral, Resource<Polynomial> underflow, Resource<Polynomial> overflow) {}
 
   private static Resource<Polynomial> clampedEffectiveIntegrand(
       Resource<Polynomial> integrand,
@@ -235,6 +246,14 @@ public final class PolynomialResources {
     cell.emit(effect(integralDynamics -> {
       double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
       coefficients[0] = value;
+      return polynomial(coefficients);
+    }));
+  }
+
+  private static void addToValue(CellResource<Polynomial> cell, double delta) {
+    cell.emit(effect(integralDynamics -> {
+      double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
+      coefficients[0] += delta;
       return polynomial(coefficients);
     }));
   }

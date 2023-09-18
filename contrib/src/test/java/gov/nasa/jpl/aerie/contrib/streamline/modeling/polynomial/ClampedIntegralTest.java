@@ -23,6 +23,8 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.junit.jupiter.api.Assertions.*;
 
+// TODO: account for under/overflow in tests below.
+
 @Nested
 @ExtendWith(MerlinExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
