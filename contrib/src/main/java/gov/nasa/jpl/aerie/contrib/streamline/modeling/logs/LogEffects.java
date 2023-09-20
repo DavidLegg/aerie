@@ -3,7 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.logs;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.effect;
 
 public final class LogEffects {
   private LogEffects() {}

@@ -1,5 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.merlin.protocol.model.CellType;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
@@ -8,46 +10,16 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 
 public final class CellRefV2 {
   private CellRefV2() {}
 
   /**
-   * Allocate a new cell with a naive effect trait.
-   *
-   * <p>
-   *     Effects are any function on the dynamics.
-   *     Concurrent effects raise an exception, and sequential effects are applied sequentially.
-   * </p>
-   */
-  public static <D extends Dynamics<?, D>> CellRef<DynamicsEffect<D>, Cell<D>> allocate(D initialDynamics) {
-    return allocate(Expiring.neverExpiring(initialDynamics));
-  }
-
-  /**
    * Allocate a new cell with an explicitly given effect type and effect trait.
    */
-  public static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> CellRef<E, Cell<D>> allocate(D initialDynamics, EffectTrait<E> effectTrait) {
-    return allocate(Expiring.neverExpiring(initialDynamics), effectTrait);
-  }
-
-  /**
-   * Allocate a new cell with a naive effect trait.
-   *
-   * <p>
-   *     Effects are any function on the dynamics.
-   *     Concurrent effects raise an exception, and sequential effects are applied sequentially.
-   * </p>
-   */
-  public static <D extends Dynamics<?, D>> CellRef<DynamicsEffect<D>, Cell<D>> allocate(Expiring<D> initialDynamics) {
-    return allocate(initialDynamics, autoEffects());
-  }
-
-  /**
-   * Allocate a new cell with an explicitly given effect type and effect trait.
-   */
-  public static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> CellRef<E, Cell<D>> allocate(Expiring<D> initialDynamics, EffectTrait<E> effectTrait) {
+  public static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> CellRef<E, Cell<D>> allocate(ErrorCatching<Expiring<D>> initialDynamics, EffectTrait<E> effectTrait) {
     return CellRef.allocate(new Cell<>(initialDynamics), new CellType<>() {
       @Override
       public EffectTrait<E> getEffectType() {
@@ -66,14 +38,15 @@ public final class CellRefV2 {
 
       @Override
       public void step(Cell<D> cell, Duration duration) {
-        cell.dynamics = Expiring.expiring(
-            cell.dynamics.data().step(duration),
-            cell.dynamics.expiry().minus(duration));
+        cell.dynamics = ErrorCatchingMonad.map(cell.dynamics, d ->
+            expiring(d.data().step(duration), d.expiry().minus(duration)));
       }
 
       @Override
       public Optional<Duration> getExpiry(Cell<D> cell) {
-        return cell.dynamics.expiry().value();
+        return cell.dynamics.match(
+            expiring -> expiring.expiry().value(),
+            exception -> Optional.empty());
       }
     });
   }
@@ -91,8 +64,8 @@ public final class CellRefV2 {
 
   public static <D extends Dynamics<?, D>> EffectTrait<DynamicsEffect<D>> autoEffects() {
     return resolvingConcurrencyBy((left, right) -> x -> {
-      final Expiring<D> lrx = left.apply(right.apply(x));
-      final Expiring<D> rlx = right.apply(left.apply(x));
+      final var lrx = left.apply(right.apply(x));
+      final var rlx = right.apply(left.apply(x));
       if (lrx.equals(rlx)) {
         return lrx;
       } else {
@@ -116,15 +89,26 @@ public final class CellRefV2 {
 
       @Override
       public DynamicsEffect<D> concurrently(final DynamicsEffect<D> left, final DynamicsEffect<D> right) {
-        return combineConcurrent.apply(left, right);
+        try {
+          final DynamicsEffect<D> combined = combineConcurrent.apply(left, right);
+          return x -> {
+            try {
+              return combined.apply(x);
+            } catch (Exception e) {
+              return failure(e);
+            }
+          };
+        } catch (Exception e) {
+          return $ -> failure(e);
+        }
       }
     };
   }
 
   public static class Cell<D> {
-    public Expiring<D> dynamics;
+    public ErrorCatching<Expiring<D>> dynamics;
 
-    public Cell(Expiring<D> dynamics) {
+    public Cell(ErrorCatching<Expiring<D>> dynamics) {
       this.dynamics = dynamics;
     }
   }

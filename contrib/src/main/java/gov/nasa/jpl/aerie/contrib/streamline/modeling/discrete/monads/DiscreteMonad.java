@@ -1,7 +1,5 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.IdentityMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 
@@ -29,11 +27,5 @@ public final class DiscreteMonad {
 
   public static <A, B> Function<Discrete<A>, Discrete<B>> lift(Function<A, B> f) {
     return a -> map(a, f);
-  }
-
-  // Not monadic, strictly speaking, but useful nonetheless.
-
-  public static <A> DynamicsEffect<Discrete<A>> effect(Function<A, A> f) {
-    return ExpiringMonad.effect(lift(f));
   }
 }

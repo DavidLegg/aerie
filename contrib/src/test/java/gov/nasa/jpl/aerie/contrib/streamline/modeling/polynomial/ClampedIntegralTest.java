@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.merlin.framework.Registrar;
@@ -13,13 +14,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.clampedIntegrate;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.constant;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.EPSILON;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.MILLISECONDS;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.MINUTE;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.duration;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Nested
@@ -36,51 +42,56 @@ class ClampedIntegralTest {
   private final CellResource<Polynomial> upperBound = cellResource(polynomial(100));
   private final Resource<Polynomial> clampedIntegral = clampedIntegrate(integrandForClampedIntegrate, 5, lowerBound, upperBound);
 
-  @Test
+    @Test
   void start_at_starting_value_and_integrand_rate() {
-    Polynomial startingDynamics = clampedIntegral.getDynamics().data();
+    Polynomial startingDynamics = currentData(clampedIntegral);
     assertEquals(polynomial(5, 1), startingDynamics);
   }
 
-  // The two tests below are close to, but not exactly, right.
-  // TODO: Revisit these when we've thought through error handling a bit more.
-  /*
+  private final Resource<Polynomial> impossibleStartingIntegral = PolynomialResources.clampedIntegrate(integrandForClampedIntegrate, 5, lowerBound, constant(-1));
+
   @Test
   void impossible_starting_bounds_throws_an_exception() {
-    set(upperBound, polynomial(-1));
-    assertThrows(IllegalStateException.class, PolynomialResourcesTest::settle);
+    assertInstanceOf(ErrorCatching.Failure.class, impossibleStartingIntegral.getDynamics());
   }
 
   @Test
   void discretely_setting_impossible_bounds_throws_an_exception() {
     delay(MINUTE);
     set(lowerBound, polynomial(110));
-    assertThrows(IllegalStateException.class, PolynomialResourcesTest::settle);
+    settle();
+    assertInstanceOf(ErrorCatching.Failure.class, clampedIntegral.getDynamics());
   }
 
   @Test
   void continuously_changing_to_impossible_bounds_throws_an_exception() {
     set(upperBound, polynomial(10, -1));
-    assertThrows(IllegalStateException.class, () -> delay(11, SECONDS));
+    // Delay until the boundaries cross
+    delay(duration(10, SECONDS).plus(EPSILON));
+    // And allow time for the reacting task to update the integral
+    // TODO: Make this more immediate?
+    settle();
+    assertInstanceOf(ErrorCatching.Failure.class, clampedIntegral.getDynamics());
   }
-   */
 
   private final Resource<Polynomial> clampedIntegralWithTooHighStart = clampedIntegrate(integrandForClampedIntegrate, 110, lowerBound, upperBound);
-  @Test
+
+    @Test
   void starting_value_above_maximum_snaps_to_upper_bound() {
-    assertEquals(polynomial(100), clampedIntegralWithTooHighStart.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegralWithTooHighStart));
   }
 
   private final Resource<Polynomial> clampedIntegralWithTooLowStart = clampedIntegrate(integrandForClampedIntegrate, -10, lowerBound, upperBound);
-  @Test
+
+    @Test
   void starting_value_below_minimum_snaps_to_lower_bound() {
-    assertEquals(polynomial(0, 1), clampedIntegralWithTooLowStart.getDynamics().data());
+    assertEquals(polynomial(0, 1), currentData(clampedIntegralWithTooLowStart));
   }
 
   @Test
   void constant_integrand_behaves_like_regular_integral_within_bounds() {
     delay(10, SECONDS);
-    assertEquals(polynomial(15, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(15, 1), currentData(clampedIntegral));
   }
 
   @Test
@@ -89,7 +100,7 @@ class ClampedIntegralTest {
     delay(4, SECONDS);
     // dynamics for integral = (integral 2x) + 5 = x^2 + 5, stepped by 4 (replacing x with x + 4),
     //   = (x + 4)^2 + 5 = x^2 + 8x + 21
-    assertEquals(polynomial(21, 8, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(21, 8, 1), currentData(clampedIntegral));
   }
 
   @Test
@@ -97,9 +108,9 @@ class ClampedIntegralTest {
     delay(95, SECONDS);
     assertEquals(100, currentValue(clampedIntegral));
     settle();
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     delay(20, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
   }
 
   @Test
@@ -108,28 +119,28 @@ class ClampedIntegralTest {
     delay(5, SECONDS);
     assertEquals(0, currentValue(clampedIntegral));
     settle();
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     delay(20, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
   }
 
   @Test
   void upper_bound_discretely_crosses_integral() {
     delay(5, SECONDS);
-    assertEquals(polynomial(10, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10, 1), currentData(clampedIntegral));
     set(upperBound, polynomial(5));
     settle();
-    assertEquals(polynomial(5), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5), currentData(clampedIntegral));
   }
 
   @Test
   void lower_bound_discretely_crosses_integral() {
     set(integrandForClampedIntegrate, polynomial(-1));
     delay(1, SECONDS);
-    assertEquals(polynomial(4, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(4, -1), currentData(clampedIntegral));
     set(lowerBound, polynomial(10));
     settle();
-    assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10), currentData(clampedIntegral));
   }
 
   @Test
@@ -137,9 +148,9 @@ class ClampedIntegralTest {
     set(lowerBound, polynomial(10));
     set(upperBound, polynomial(10));
     delay(1, SECONDS);
-    assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10), currentData(clampedIntegral));
     delay(9, SECONDS);
-    assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10), currentData(clampedIntegral));
   }
 
   @Test
@@ -149,11 +160,11 @@ class ClampedIntegralTest {
     delay(1, SECONDS);
     // New dynamics = 2x^2 - x + 10 stepped by 1 seconds:
     //   = 2(x + 1)^2 - (x + 1) + 10 = 2x^2 + 4x + 2 - x - 1 + 10 = 2x^2 + 3x + 11
-    assertEquals(polynomial(11, 3, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(11, 3, 2), currentData(clampedIntegral));
     delay(9, SECONDS);
     // New dynamics = 2x^2 - x + 10 stepped by 10 seconds:
     //   = 2(x + 10)^2 - (x + 10) + 10 = 2x^2 + 40x + 200 - x - 10 + 10 = 2x^2 + 39x + 200
-    assertEquals(polynomial(200, 39, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(200, 39, 2), currentData(clampedIntegral));
   }
 
   @Test
@@ -161,16 +172,16 @@ class ClampedIntegralTest {
     set(upperBound, polynomial(20, 1));
     set(integrandForClampedIntegrate, polynomial(2));
     settle();
-    assertEquals(polynomial(5, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, 2), currentData(clampedIntegral));
     delay(15, SECONDS);
     assertEquals(35, currentValue(clampedIntegral));
-    assertEquals(polynomial(2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(2), currentData(integrandForClampedIntegrate));
     settle();
-    assertEquals(polynomial(35, 1), clampedIntegral.getDynamics().data());
-    assertEquals(polynomial(2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(35, 1), currentData(clampedIntegral));
+    assertEquals(polynomial(2), currentData(integrandForClampedIntegrate));
     delay(10, SECONDS);
-    assertEquals(polynomial(45, 1), clampedIntegral.getDynamics().data());
-    assertEquals(polynomial(2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(45, 1), currentData(clampedIntegral));
+    assertEquals(polynomial(2), currentData(integrandForClampedIntegrate));
   }
 
   @Test
@@ -178,16 +189,16 @@ class ClampedIntegralTest {
     set(lowerBound, polynomial(0, -1));
     set(integrandForClampedIntegrate, polynomial(-2));
     settle();
-    assertEquals(polynomial(5, -2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, -2), currentData(clampedIntegral));
     delay(5, SECONDS);
     assertEquals(-5, currentValue(clampedIntegral));
-    assertEquals(polynomial(-2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(-2), currentData(integrandForClampedIntegrate));
     settle();
-    assertEquals(polynomial(-5, -1), clampedIntegral.getDynamics().data());
-    assertEquals(polynomial(-2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(-5, -1), currentData(clampedIntegral));
+    assertEquals(polynomial(-2), currentData(integrandForClampedIntegrate));
     delay(10, SECONDS);
-    assertEquals(polynomial(-15, -1), clampedIntegral.getDynamics().data());
-    assertEquals(polynomial(-2), integrandForClampedIntegrate.getDynamics().data());
+    assertEquals(polynomial(-15, -1), currentData(clampedIntegral));
+    assertEquals(polynomial(-2), currentData(integrandForClampedIntegrate));
   }
 
   @Test
@@ -197,9 +208,9 @@ class ClampedIntegralTest {
     delay(5, SECONDS);
     assertEquals(5, currentValue(clampedIntegral));
     settle();
-    assertEquals(polynomial(5, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, -1), currentData(clampedIntegral));
     delay(2, SECONDS);
-    assertEquals(polynomial(3, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(3, -1), currentData(clampedIntegral));
   }
 
   @Test
@@ -209,55 +220,55 @@ class ClampedIntegralTest {
     delay(5, SECONDS);
     assertEquals(5, currentValue(clampedIntegral));
     settle();
-    assertEquals(polynomial(5, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, 1), currentData(clampedIntegral));
     delay(2, SECONDS);
-    assertEquals(polynomial(7, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(7, 1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_upper_bound_then_discretely_change_integrand_sign_to_resume_integration() {
     delay(100, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(-1));
     settle();
-    assertEquals(polynomial(100, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100, -1), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(90, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(90, -1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_lower_bound_then_discretely_change_integrand_sign_to_resume_integration() {
     set(integrandForClampedIntegrate, polynomial(-1));
     delay(10, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(1));
     settle();
-    assertEquals(polynomial(0, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0, 1), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(10, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10, 1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_upper_bound_then_discretely_change_integrand_without_resuming_integration() {
     delay(100, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(0.1));
     settle();
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
   }
 
   @Test
   void hits_lower_bound_then_discretely_change_integrand_without_resuming_integration() {
     set(integrandForClampedIntegrate, polynomial(-1));
     delay(10, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(-0.1));
     settle();
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
   }
 
   @Test
@@ -265,12 +276,12 @@ class ClampedIntegralTest {
     set(upperBound, polynomial(10, 2));
     set(integrandForClampedIntegrate, polynomial(10));
     delay(10, SECONDS);
-    assertEquals(polynomial(30, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(30, 2), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(1));
     settle();
-    assertEquals(polynomial(30, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(30, 1), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(40, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(40, 1), currentData(clampedIntegral));
   }
 
   @Test
@@ -278,12 +289,12 @@ class ClampedIntegralTest {
     set(upperBound, polynomial(10, 2));
     set(integrandForClampedIntegrate, polynomial(10));
     delay(10, SECONDS);
-    assertEquals(polynomial(30, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(30, 2), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(3));
     settle();
-    assertEquals(polynomial(30, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(30, 2), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(50, 2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(50, 2), currentData(clampedIntegral));
   }
 
   @Test
@@ -291,12 +302,12 @@ class ClampedIntegralTest {
     set(lowerBound, polynomial(0, -2));
     set(integrandForClampedIntegrate, polynomial(-10));
     delay(10, SECONDS);
-    assertEquals(polynomial(-20, -2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(-20, -2), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(-3));
     settle();
-    assertEquals(polynomial(-20, -2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(-20, -2), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(-40, -2), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(-40, -2), currentData(clampedIntegral));
   }
 
   @Test
@@ -304,12 +315,12 @@ class ClampedIntegralTest {
     set(upperBound, polynomial(20, -1));
     set(integrandForClampedIntegrate, polynomial(10));
     delay(5, SECONDS);
-    assertEquals(polynomial(15, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(15, -1), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(-0.5));
     settle();
-    assertEquals(polynomial(15, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(15, -1), currentData(clampedIntegral));
     delay(5, SECONDS);
-    assertEquals(polynomial(10, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10, -1), currentData(clampedIntegral));
   }
 
   @Test
@@ -317,58 +328,58 @@ class ClampedIntegralTest {
     set(lowerBound, polynomial(0, 1));
     set(integrandForClampedIntegrate, polynomial(-10));
     delay(5, SECONDS);
-    assertEquals(polynomial(5, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, 1), currentData(clampedIntegral));
     set(integrandForClampedIntegrate, polynomial(0.5));
     settle();
-    assertEquals(polynomial(5, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(5, 1), currentData(clampedIntegral));
     delay(5, SECONDS);
-    assertEquals(polynomial(10, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10, 1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_upper_bound_then_discretely_change_bound_to_resume_integration() {
     delay(100, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     set(upperBound, polynomial(200));
     settle();
-    assertEquals(polynomial(100, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100, 1), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(110, 1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(110, 1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_lower_bound_then_discretely_change_bound_to_resume_integration() {
     set(integrandForClampedIntegrate, polynomial(-1));
     delay(10, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     set(lowerBound, polynomial(-100));
     settle();
-    assertEquals(polynomial(0, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0, -1), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(-10, -1), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(-10, -1), currentData(clampedIntegral));
   }
 
   @Test
   void hits_upper_bound_then_discretely_change_bound_without_resuming_integration() {
     delay(100, SECONDS);
-    assertEquals(polynomial(100), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(100), currentData(clampedIntegral));
     set(upperBound, polynomial(90));
     settle();
-    assertEquals(polynomial(90), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(90), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(90), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(90), currentData(clampedIntegral));
   }
 
   @Test
   void hits_lower_bound_then_discretely_change_bound_without_resuming_integration() {
     set(integrandForClampedIntegrate, polynomial(-1));
     delay(10, SECONDS);
-    assertEquals(polynomial(0), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(0), currentData(clampedIntegral));
     set(lowerBound, polynomial(10));
     settle();
-    assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10), currentData(clampedIntegral));
     delay(10, SECONDS);
-    assertEquals(polynomial(10), clampedIntegral.getDynamics().data());
+    assertEquals(polynomial(10), currentData(clampedIntegral));
   }
 
   @Test

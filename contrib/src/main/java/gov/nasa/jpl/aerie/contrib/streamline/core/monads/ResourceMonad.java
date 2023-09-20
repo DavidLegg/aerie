@@ -15,11 +15,16 @@ public final class ResourceMonad {
   private ResourceMonad() {}
 
   public static <A> Resource<A> unit(A a) {
-    return ResourceMonadTransformer.unit(ExpiringMonad::unit, a);
+    return ExpiringMonadTransformer.unit(ExpiringToResourceMonad::unit, a);
   }
 
   public static <A, B> Resource<B> bind(Resource<A> a, Function<A, Resource<B>> f) {
-    return ResourceMonadTransformer.bind(ExpiringMonad::bind, a, f);
+    return ExpiringMonadTransformer.<A, Resource<A>, B, Resource<B>>bind(
+        ExpiringToResourceMonad::unit,
+        ExpiringToResourceMonad::bind,
+        ExpiringToResourceMonad::bind,
+        a,
+        f);
   }
 
   // Convenient methods defined in terms of bind and unit:
@@ -34,6 +39,14 @@ public final class ResourceMonad {
 
   public static <A, B, C, D> Resource<D> map(Resource<A> a, Resource<B> b, Resource<C> c, TriFunction<A, B, C, D> f) {
     return bind(a, a$ -> map(b, c, (b$, c$) -> f.apply(a$, b$, c$)));
+  }
+
+  public static <A, B, C> Resource<C> bind(Resource<A> a, Resource<B> b, BiFunction<A, B, Resource<C>> f) {
+    return bind(a, a$ -> bind(b, b$ -> f.apply(a$, b$)));
+  }
+
+  public static <A, B, C, D> Resource<D> bind(Resource<A> a, Resource<B> b, Resource<C> c, TriFunction<A, B, C, Resource<D>> f) {
+    return bind(a, a$ -> bind(b, c, (b$, c$) -> f.apply(a$, b$, c$)));
   }
 
   public static <A, B> Function<Resource<A>, Resource<B>> lift(Function<A, B> f) {

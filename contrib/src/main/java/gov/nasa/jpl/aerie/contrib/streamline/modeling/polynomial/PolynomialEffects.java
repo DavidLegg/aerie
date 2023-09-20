@@ -8,7 +8,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAware;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.effect;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
 public final class PolynomialEffects {

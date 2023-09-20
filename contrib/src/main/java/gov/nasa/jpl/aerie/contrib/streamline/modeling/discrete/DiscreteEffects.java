@@ -3,7 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAware;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.effect;
 
 public final class DiscreteEffects {
   private DiscreteEffects() {}

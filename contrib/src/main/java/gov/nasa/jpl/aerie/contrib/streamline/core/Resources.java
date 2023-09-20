@@ -7,8 +7,10 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
 import java.util.Optional;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 
@@ -31,7 +33,7 @@ public final class Resources {
     currentTime();
   }
 
-  private static CellResource<ClockDynamics> CLOCK = CellResource.cellResource(new ClockDynamics(ZERO));
+  private static CellResource<ClockDynamics> CLOCK = cellResource(new ClockDynamics(ZERO));
   public static Duration currentTime() {
     try {
       return currentValue(CLOCK);
@@ -39,27 +41,38 @@ public final class Resources {
       // If we're running unit tests, several simulations can happen without reloading the Resources class.
       // In that case, we'll have discarded the clock cell we were using, and get the above exception.
       // REVIEW: Is there a cleaner way to make sure this cell gets (re-)initialized?
-      CLOCK = CellResource.cellResource(new ClockDynamics(ZERO));
+      CLOCK = cellResource(new ClockDynamics(ZERO));
       return currentValue(CLOCK);
     }
   }
 
+  public static <D> D currentData(Resource<D> resource) {
+    return resource.getDynamics().getOrThrow().data();
+  }
+
   public static <V, D extends Dynamics<V, D>> V currentValue(Resource<D> resource) {
-    return resource.getDynamics().data().extract();
+    return currentData(resource).extract();
   }
 
   public static <D extends Dynamics<?, D>> Condition dynamicsChange(Resource<D> resource) {
-    final Expiring<D> startingDynamics = resource.getDynamics();
+    final var startingDynamics = resource.getDynamics();
     final Duration startTime = currentTime();
     return (positive, atEarliest, atLatest) -> {
-      Expiring<D> currentDynamics = resource.getDynamics();
-      boolean haveChanged = !currentDynamics.data().equals(
-          startingDynamics.data().step(currentTime().minus(startTime)));
+      var currentDynamics = resource.getDynamics();
+      boolean haveChanged = startingDynamics.match(
+          start -> currentDynamics.match(
+              current -> !current.data().equals(start.data().step(currentTime().minus(startTime))),
+              ignored -> true),
+          startException -> currentDynamics.match(
+              ignored -> true,
+              currentException -> !startException.equals(currentException)));
 
       return positive == haveChanged
           ? Optional.of(atEarliest)
           : positive
-            ? currentDynamics.expiry().value().filter(atLatest::noShorterThan)
+            ? currentDynamics.match(
+                expiring -> expiring.expiry().value().filter(atLatest::noShorterThan),
+                exception -> Optional.empty())
             : Optional.empty();
     };
   }
@@ -83,15 +96,9 @@ public final class Resources {
    * </p>
    */
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
-    var cell = allocate(resource.getDynamics());
-    // TODO: Implement an efficient repeating task and use it here.
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(resource));
-        cell.emit($ -> resource.getDynamics());
-      }
-    });
-    return () -> cell.get().dynamics;
+    var cell = cellResource(resource.getDynamics());
+    wheneverDynamicsChange(resource, newDynamics -> cell.emit($ -> newDynamics));
+    return cell;
   }
 
   /**
@@ -124,34 +131,29 @@ public final class Resources {
   // in favor of allowing resources to report expiry information directly.
   // This would be cleaner and potentially more performant.
   public static <D extends Dynamics<?, D>> Resource<D> signalling(Resource<D> resource) {
-    var cell = allocate(discrete(Unit.UNIT));
-    // TODO: Implement an efficient repeating task and use it here.
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(resource));
-        cell.emit($ -> $);
-      }
-    });
+    var cell = cellResource(discrete(Unit.UNIT));
+    wheneverDynamicsChange(resource, ignored -> cell.emit($ -> $));
     return () -> {
-      cell.get();
+      cell.getDynamics();
       return resource.getDynamics();
     };
   }
 
   public static <D extends Dynamics<?, D>> Resource<D> shift(Resource<D> resource, Duration interval, D initialDynamics) {
-    var cell = allocate(initialDynamics);
-    // TODO: Implement an efficient repeating task and use it here.
-    spawn(() -> {
-      while (true) {
-        spawn(replaying(() -> {
-          var dynamics = resource.getDynamics();
-          delay(interval);
-          cell.emit($ -> dynamics);
-        }));
-        waitUntil(dynamicsChange(resource));
-      }
-    });
-    return () -> cell.get().dynamics;
+    var cell = cellResource(initialDynamics);
+    delayedSet(cell, resource.getDynamics(), interval);
+    wheneverDynamicsChange(resource, newDynamics ->
+        delayedSet(cell, newDynamics, interval));
+    return cell;
+  }
+
+  private static <D extends Dynamics<?, D>> void delayedSet(
+      CellResource<D> cell, ErrorCatching<Expiring<D>> newDynamics, Duration interval)
+  {
+    spawn(replaying(() -> {
+      delay(interval);
+      cell.emit($ -> newDynamics);
+    }));
   }
 
   private record ClockDynamics(Duration time) implements Dynamics<Duration, ClockDynamics> {

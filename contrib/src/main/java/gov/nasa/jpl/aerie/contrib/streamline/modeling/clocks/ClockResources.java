@@ -6,6 +6,8 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
@@ -17,16 +19,15 @@ public final class ClockResources {
   private ClockResources() {}
 
   public static Resource<Clock> clock() {
-    var cell = allocate(Clock.clock(ZERO));
-    return () -> cell.get().dynamics;
+    return cellResource(Clock.clock(ZERO));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Clock> clock, Duration threshold) {
     return signalling(bind(clock, (Clock c) -> () -> {
       final Duration crossoverTime = threshold.minus(c.extract());
-      return crossoverTime.isPositive()
+      return success(crossoverTime.isPositive()
           ? expiring(discrete(true), crossoverTime)
-          : neverExpiring(discrete(false));
+          : neverExpiring(discrete(false)));
     }));
   }
 

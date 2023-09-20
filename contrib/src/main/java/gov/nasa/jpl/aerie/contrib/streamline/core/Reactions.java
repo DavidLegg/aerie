@@ -3,8 +3,10 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.dynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.when;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
@@ -30,5 +32,10 @@ public final class Reactions {
       // Trampoline off this task to avoid replaying.
       whenever(trigger, action);
     }));
+  }
+
+  // Special case for dynamicsChange condition, since it's non-obvious that this needs to be run in lambda form
+  public static <D extends Dynamics<?, D>> void wheneverDynamicsChange(Resource<D> resource, Consumer<ErrorCatching<Expiring<D>>> reaction) {
+    whenever(() -> dynamicsChange(resource), () -> reaction.accept(resource.getDynamics()));
   }
 }

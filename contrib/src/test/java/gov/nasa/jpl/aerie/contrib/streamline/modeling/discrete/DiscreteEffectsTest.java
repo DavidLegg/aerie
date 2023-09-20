@@ -1,7 +1,9 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareResources;
 import gov.nasa.jpl.aerie.merlin.framework.Registrar;
@@ -33,6 +35,7 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -57,7 +60,7 @@ class DiscreteEffectsTest {
     spawn(() -> set(settable, 123));
     spawn(() -> set(settable, 456));
     delay(ZERO);
-    assertThrows(UnsupportedOperationException.class, settable::getDynamics);
+    assertInstanceOf(ErrorCatching.Failure.class, settable.getDynamics());
   }
 
   @Test
@@ -157,6 +160,8 @@ class DiscreteEffectsTest {
     });
     assertEquals(initialValue, currentValue(nonconsumable));
   }
+
+  CellResource<Clock> DEBUG_clock = cellResource(new Clock(ZERO));
 
   @Test
   void using_runs_synchronously() {

@@ -1,7 +1,13 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringToResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Unit;
@@ -13,20 +19,17 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import java.util.Arrays;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.shift;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.when;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.bindEffect;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.map;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.unit;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.waitUntil;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.dynamicsChange;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.effect;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.UnitAwareResources.extend;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
@@ -34,7 +37,7 @@ public final class PolynomialResources {
   private PolynomialResources() {}
 
   public static Resource<Polynomial> constant(double value) {
-    var dynamics = neverExpiring(polynomial(value));
+    var dynamics = unit(polynomial(value));
     return () -> dynamics;
   }
 
@@ -43,7 +46,7 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> asPolynomial(Resource<Discrete<Double>> discrete) {
-    return map(discrete, d -> polynomial(d.extract()));
+    return ResourceMonad.map(discrete, d -> polynomial(d.extract()));
   }
 
   public static UnitAware<Resource<Polynomial>> asPolynomial(UnitAware<Resource<Discrete<Double>>> discrete) {
@@ -51,163 +54,42 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> add(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return map(p, q, Polynomial::add);
+    return ResourceMonad.map(p, q, Polynomial::add);
   }
 
   public static Resource<Polynomial> subtract(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return map(p, q, Polynomial::subtract);
+    return ResourceMonad.map(p, q, Polynomial::subtract);
   }
 
   public static Resource<Polynomial> multiply(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return map(p, q, Polynomial::multiply);
+    return ResourceMonad.map(p, q, Polynomial::multiply);
   }
 
   public static Resource<Polynomial> divide(Resource<Polynomial> p, Resource<Discrete<Double>> q) {
-    return map(p, q, (p$, q$) -> p$.divide(q$.extract()));
+    return ResourceMonad.map(p, q, (p$, q$) -> p$.divide(q$.extract()));
   }
 
-  public static Resource<Polynomial> integrate(Resource<Polynomial> p, double startingValue) {
-    var cell = allocate(p.getDynamics().data().integral(startingValue));
-    // TODO: Use an efficient repeating task here
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(p));
-        var p$ = p.getDynamics().data();
-        cell.emit(effect(integralDynamics -> p$.integral(integralDynamics.extract())));
-      }
-    });
-    return () -> cell.get().dynamics;
-  }
-
-  /**
-   * Integrates {@param integrand}, but clamps the value.
-   * Clamping is done by adjusting the integrand,
-   * so that values change immediately when rate reverses.
-   * @param integrand
-   * @param startingValue
-   * @param minimum
-   * @param maximum
-   * @return
-   */
-  public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, double minimum, double maximum) {
-    if (maximum <= minimum) {
-      throw new IllegalArgumentException("Maximum (" + maximum + ") is less than/equal to minimum (" + minimum + ")");
-    }
-    if (startingValue > maximum || startingValue < minimum) {
-      throw new IllegalArgumentException("Starting value (" + startingValue + ") out of bounds: [" + minimum + "," + maximum + "]");
-    }
-
-
-    CellResource<Polynomial> resultCopy = CellResource.cellResource(integrand.getDynamics().data().integral(startingValue));
-    var lte = lessThanOrEquals(resultCopy, maximum);
-    var gte = greaterThanOrEquals(resultCopy, minimum);
-    var effectiveIntegrand = map(
-      integrand, gte, lte,
-      (integrand$, gte$, lte$) -> {
-        if (!lte$.extract() && integrand$.lessThanOrEquals(0.0).data().extract()) {
-          // we have exceeded the upper limit BUT we have a negative or 0 rate/integrand
-          // SHOULD WORK FOR ANY DEGREE INTEGRAND - IF DERIVATIVE IS NEGATIVE IT WILL DECREASE, SO
-          //      DERIVATIVE BECOMING POSITIVE ONLY HAS CONSEQUENCE IF WE GO BACK TO HITTING CLAMP LIMIT
-          //      WHICH WOULD TRIGGER THIS CHECK AGAIN AS WE HIT GTE.
-          return integrand$;
-        }
-        else if (!gte$.extract() && integrand$.greaterThanOrEquals(0.0).data().extract()) {
-          // we have fallen under the lower limit BUT we have a positive or 0 rate/integrand
-          return integrand$;
-        }
-        else if (lte$.extract() && gte$.extract()) {
-          return integrand$;
-        }
-        else {
-          return Polynomial.polynomial(0.0);
-        }
-      }
-    );
-    var result = integrate(effectiveIntegrand, startingValue);
-    // TODO: Use an efficient repeating task here
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(result));
-        var resultDynamics = result.getDynamics();
-        resultCopy.emit(ignored -> resultDynamics);
-      }
-    });
-    return result;
+  public static Resource<Polynomial> integrate(Resource<Polynomial> integrand, double startingValue) {
+    var cell = cellResource(map(integrand.getDynamics(), (Polynomial $) -> $.integral(startingValue)));
+    // Use integrand's expiry but not integral's, since we're refreshing the integral
+    wheneverDynamicsChange(integrand, integrandDynamics ->
+        cell.emit(bindEffect(integral -> DynamicsMonad.map(integrandDynamics, integrand$ ->
+            integrand$.integral(integral.extract())))));
+    return cell;
   }
 
   public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    return clampedIntegrate2(integrand, startingValue, minimum, maximum);
-  }
-
-  public static Resource<Polynomial> clampedIntegrate1(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    if (startingValue > maximum.getDynamics().data().extract() || startingValue < minimum.getDynamics().data().extract()) {
-      throw new IllegalArgumentException("Starting value (" + startingValue + ") out of initial bounds: [" + minimum.getDynamics().data().extract() + "," + maximum.getDynamics().data().extract() + "]");
-    }
-
-    CellResource<Polynomial> resultCopy = CellResource.cellResource(integrand.getDynamics().data().integral(startingValue));
-    var lte = lessThanOrEquals(resultCopy, maximum);
-    var gte = greaterThanOrEquals(resultCopy, minimum);
-    var effectiveIntegrand = map(
-        integrand, gte, lte,
-        (integrand$, gte$, lte$) -> {
-          if (!lte$.extract() && integrand$.lessThanOrEquals(0.0).data().extract()) {
-            // we have exceeded the upper limit BUT we have a negative or 0 rate/integrand
-            // SHOULD WORK FOR ANY DEGREE INTEGRAND - IF DERIVATIVE IS NEGATIVE IT WILL DECREASE, SO
-            //      DERIVATIVE BECOMING POSITIVE ONLY HAS CONSEQUENCE IF WE GO BACK TO HITTING CLAMP LIMIT
-            //      WHICH WOULD TRIGGER THIS CHECK AGAIN AS WE HIT GTE.
-            return integrand$;
-          }
-          else if (!gte$.extract() && integrand$.greaterThanOrEquals(0.0).data().extract()) {
-            // we have fallen under the lower limit BUT we have a positive or 0 rate/integrand
-            return integrand$;
-          }
-          else if (lte$.extract() && gte$.extract()) {
-            return integrand$;
-          }
-          else {
-            return Polynomial.polynomial(0.0);
-          }
-        }
-    );
-    var result = integrate(effectiveIntegrand, startingValue);
-    // TODO: Use an efficient repeating task here
-    spawn(() -> {
-      while (true) {
-        waitUntil(dynamicsChange(result));
-        var resultDynamics = result.getDynamics();
-        resultCopy.emit(ignored -> resultDynamics);
-      }
-    });
-
-    // check, if minimum and maximum are changing values or have changed, that min < max still (else err out)
-    spawn(() -> {
-      while (true) {
-        if (lessThanOrEquals(maximum, minimum).getDynamics().data().extract()) {
-          throw new IllegalArgumentException("Maximum (" + maximum.getDynamics().data() + " -> " + maximum.getDynamics().data().extract() + ") is less than/equal to minimum (" + minimum.getDynamics().data().extract() + " -> " + minimum.getDynamics().data().extract() + ")");
-        }
-        waitUntil(dynamicsChange(lessThanOrEquals(maximum, minimum)));
-        throw new IllegalArgumentException("Maximum (" + maximum.getDynamics().data() + " -> " + maximum.getDynamics().data().extract() + ") is less than/equal to minimum (" + minimum.getDynamics().data().extract() + " -> " + minimum.getDynamics().data().extract() + ")");
-        }
-    });
-    return result;
-  }
-
-  public static Resource<Polynomial> clampedIntegrate2(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    whenever(lessThan(maximum, minimum), () -> {
-      throw new IllegalStateException(
-          "Inverted bounds for clamped integral: maximum %f < minimum %f"
-              .formatted(currentValue(maximum), currentValue(minimum)));
-    });
     // Clamp the starting value so integral always starts out legal:
-    double clampedStartingValue = Math.min(Math.max(startingValue, currentValue(minimum)), currentValue(maximum));
+    var clampedStartingValue = clamp(constant(startingValue), minimum, maximum);
     // Bootstrap integral by initially using a constant "integral" resource:
-    var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, constant(clampedStartingValue));
+    var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, clampedStartingValue);
     // This way, the cell is initialized to the correct dynamics.
-    var cell = cellResource(initialEffectiveIntegrand.getDynamics().data().integral(clampedStartingValue));
+    var cell = cellResource(map(initialEffectiveIntegrand.getDynamics(), (Polynomial $) -> $.integral(currentValue(clampedStartingValue))));
     var effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
-    whenever(() -> dynamicsChange(effectiveIntegrand), () -> {
-      var integrandDynamics = effectiveIntegrand.getDynamics().data();
-      cell.emit(effect(integralDynamics -> integrandDynamics.integral(integralDynamics.extract())));
+    // Use integrand's expiry but not integral's, since we're refreshing the integral
+    wheneverDynamicsChange(effectiveIntegrand, integrandDynamics -> {
+      cell.emit(bindEffect(integral -> ErrorCatchingMonad.map(integrandDynamics, integrand$ ->
+          neverExpiring(integrand$.data().integral(integral.extract())))));
     });
     // correction for discretely changing bounds / overshoots due to discretization of time
     whenever(greaterThan(cell, maximum), () -> setValue(cell, currentValue(maximum)));
@@ -221,19 +103,24 @@ public final class PolynomialResources {
       Resource<Polynomial> maximum,
       Resource<Polynomial> integral)
   {
+    var impossible = lessThan(maximum, minimum);
     var empty = lessThanOrEquals(integral, minimum);
     var full = greaterThanOrEquals(integral, maximum);
-    return bind(
-        empty, empty$ -> bind(full, full$ -> {
-          Resource<Polynomial> result = integrand;
-          if (empty$.extract()) {
-            result = max(result, differentiate(minimum));
-          }
-          if (full$.extract()) {
-            result = min(result, differentiate(maximum));
-          }
-          return result;
-        }));
+    return bind(impossible, empty, full, (impossible$, empty$, full$) -> {
+      if (impossible$.extract()) {
+        throw new IllegalStateException(
+            "Inverted bounds for clamped integral: maximum %f < minimum %f"
+                .formatted(currentValue(maximum), currentValue(minimum)));
+      }
+      Resource<Polynomial> result = integrand;
+      if (empty$.extract()) {
+        result = max(result, differentiate(minimum));
+      }
+      if (full$.extract()) {
+        result = min(result, differentiate(maximum));
+      }
+      return result;
+    });
   }
 
   private static void setValue(CellResource<Polynomial> cell, double value) {
@@ -245,7 +132,7 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> differentiate(Resource<Polynomial> p) {
-    return map(p, Polynomial::derivative);
+    return ResourceMonad.map(p, Polynomial::derivative);
   }
 
   public static Resource<Polynomial> movingAverage(Resource<Polynomial> p, Duration interval) {
@@ -255,19 +142,19 @@ public final class PolynomialResources {
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, double threshold) {
-    return bind(p, p$ -> () -> p$.greaterThan(threshold));
+    return bind(p, p$ -> ExpiringToResourceMonad.unit(p$.greaterThan(threshold)));
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return bind(p, p$ -> () -> p$.greaterThanOrEquals(threshold));
+    return bind(p, p$ -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(threshold)));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, double threshold) {
-    return bind(p, p$ -> () -> p$.lessThan(threshold));
+    return bind(p, p$ -> ExpiringToResourceMonad.unit(p$.lessThan(threshold)));
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return bind(p, p$ -> () -> p$.lessThanOrEquals(threshold));
+    return bind(p, p$ -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(threshold)));
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, Resource<Polynomial> q) {
@@ -287,17 +174,26 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return map(p, q, lessThan(p, q),
-               (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
+    return ResourceMonad.map(p, q, lessThan(p, q),
+                             (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
   }
 
   public static Resource<Polynomial> max(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return map(p, q, greaterThan(p, q),
-               (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
+    return ResourceMonad.map(p, q, greaterThan(p, q),
+                             (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
   }
 
   public static Resource<Polynomial> clamp(Resource<Polynomial> p, Resource<Polynomial> lowerBound, Resource<Polynomial> upperBound) {
-    return max(lowerBound, min(upperBound, p));
+    return ResourceMonad.bind(
+        lessThan(upperBound, lowerBound),
+        impossible -> {
+          if (impossible.extract()) {
+            throw new IllegalStateException(
+                "Inverted bounds for clamp: maximum %f < minimum %f"
+                    .formatted(currentValue(upperBound), currentValue(lowerBound)));
+          }
+          return max(lowerBound, min(upperBound, p));
+        });
   }
 
   private static Polynomial scalePolynomial(Polynomial p, double s) {
@@ -378,6 +274,6 @@ public final class PolynomialResources {
   }
 
   public static UnitAware<Resource<Polynomial>> clamp(UnitAware<Resource<Polynomial>> p, UnitAware<Resource<Polynomial>> lowerBound, UnitAware<Resource<Polynomial>> upperBound) {
-    return max(lowerBound, min(upperBound, p));
+    return unitAware(clamp(p.value(), lowerBound.value(p.unit()), upperBound.value(p.unit())), p.unit());
   }
 }

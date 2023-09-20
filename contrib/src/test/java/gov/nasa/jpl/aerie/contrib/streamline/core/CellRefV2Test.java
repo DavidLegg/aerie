@@ -2,6 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import org.junit.jupiter.api.Nested;
@@ -11,10 +12,12 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.commutingEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.noncommutingEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.effect;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.unit;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -26,7 +29,7 @@ class CellRefV2Test {
   @TestInstance(Lifecycle.PER_CLASS)
   class NonCommutingEffects {
     private final CellRef<DynamicsEffect<Discrete<Integer>>, Cell<Discrete<Integer>>> cell =
-        allocate(discrete(42), noncommutingEffects());
+        allocate(unit(42), noncommutingEffects());
 
     @Test
     void gets_initial_value_if_no_effects_are_emitted() {
@@ -53,7 +56,7 @@ class CellRefV2Test {
       spawn(() -> cell.emit(effect(n -> 3 * n)));
       spawn(() -> cell.emit(effect(n -> 3 * n)));
       delay(ZERO);
-      assertThrows(UnsupportedOperationException.class, cell::get);
+      assertInstanceOf(ErrorCatching.Failure.class, cell.get().dynamics);
     }
   }
 
@@ -62,7 +65,7 @@ class CellRefV2Test {
   @TestInstance(Lifecycle.PER_CLASS)
   class CommutingEffects {
     private final CellRef<DynamicsEffect<Discrete<Integer>>, Cell<Discrete<Integer>>> cell =
-        allocate(discrete(42), commutingEffects());
+        allocate(unit(42), commutingEffects());
 
     @Test
     void gets_initial_value_if_no_effects_are_emitted() {
@@ -102,7 +105,7 @@ class CellRefV2Test {
   @TestInstance(Lifecycle.PER_CLASS)
   class AutoEffects {
     private final CellRef<DynamicsEffect<Discrete<Integer>>, Cell<Discrete<Integer>>> cell =
-        allocate(discrete(42));
+        allocate(unit(42), autoEffects());
 
     @Test
     void gets_initial_value_if_no_effects_are_emitted() {
@@ -141,11 +144,11 @@ class CellRefV2Test {
       spawn(() -> cell.emit(effect(n -> 3 * n)));
       spawn(() -> cell.emit(effect(n -> n + 1)));
       delay(ZERO);
-      assertThrows(UnsupportedOperationException.class, cell::get);
+      assertInstanceOf(ErrorCatching.Failure.class, cell.get().dynamics);
     }
   }
 
   private static <T> T discreteCellValue(CellRef<DynamicsEffect<Discrete<T>>, Cell<Discrete<T>>> cell) {
-    return cell.get().dynamics.data().extract();
+    return cell.get().dynamics.getOrThrow().data().extract();
   }
 }
