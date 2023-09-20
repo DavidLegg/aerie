@@ -3,17 +3,13 @@ package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingToResourceMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
 import java.util.Stack;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
-import static gov.nasa.jpl.aerie.merlin.protocol.types.Unit.UNIT;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 
 /**
  * Functions for debugging resources by tracing their calculation.
@@ -43,14 +39,14 @@ public final class Tracing {
   public static <D> Resource<D> traceFull(String name, Consumer<ErrorCatching<Expiring<D>>> assertion, Resource<D> resource) {
     return () -> {
       activeResources.push(name);
-      System.out.printf("TRACE: %s computing...", formatStack());
+      System.out.printf("TRACE: %s - %s computing...", currentTime(), formatStack());
       var result = resource.getDynamics();
       try {
         assertion.accept(result);
       } catch (Exception e) {
         result = failure(e);
       }
-      System.out.printf("TRACE: %s: %s%n", formatStack(), result);
+      System.out.printf("TRACE: %s - %s: %s%n", currentTime(), formatStack(), result);
       activeResources.pop();
       return result;
     };
