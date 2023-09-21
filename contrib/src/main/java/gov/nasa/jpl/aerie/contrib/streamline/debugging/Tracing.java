@@ -62,7 +62,7 @@ public final class Tracing {
 
   private static <T> T traceAction(String name, Supplier<T> action) {
     activeTracePoints.push(name);
-    System.out.printf("TRACE: %s - %s start...", currentTime(), formatStack());
+    System.out.printf("TRACE: %s - %s start...%n", currentTime(), formatStack());
     T result = action.get();
     System.out.printf("TRACE: %s - %s: %s%n", currentTime(), formatStack(), result);
     activeTracePoints.pop();
