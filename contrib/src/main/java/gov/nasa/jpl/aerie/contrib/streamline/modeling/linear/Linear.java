@@ -14,7 +14,7 @@ public record Linear(Double extract, Double rate) implements Dynamics<Double, Li
     return linear(extract() + t.ratioOver(SECOND) * rate(), rate());
   }
 
-  static Linear linear(double value, double rate) {
+  public static Linear linear(double value, double rate) {
     return new Linear(value, rate);
   }
 }
