@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
@@ -19,6 +20,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import java.util.Arrays;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
@@ -174,13 +176,11 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return ResourceMonad.map(p, q, lessThan(p, q),
-                             (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
+    return ResourceMonad.bind(p, q, (p$, q$) -> ExpiringToResourceMonad.unit(p$.min(q$)));
   }
 
   public static Resource<Polynomial> max(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return ResourceMonad.map(p, q, greaterThan(p, q),
-                             (p$, q$, chooseP) -> chooseP.extract() ? p$ : q$);
+    return ResourceMonad.bind(p, q, (p$, q$) -> ExpiringToResourceMonad.unit(p$.max(q$)));
   }
 
   public static Resource<Polynomial> clamp(Resource<Polynomial> p, Resource<Polynomial> lowerBound, Resource<Polynomial> upperBound) {

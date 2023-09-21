@@ -2,6 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import org.apache.commons.math3.analysis.solvers.LaguerreSolver;
@@ -9,6 +10,7 @@ import org.apache.commons.math3.complex.Complex;
 
 import java.util.Arrays;
 import java.util.function.DoublePredicate;
+import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -18,6 +20,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.expiry;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.EPSILON;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.apache.commons.math3.analysis.polynomials.PolynomialsUtils.shift;
 
 public record Polynomial(double[] coefficients) implements Dynamics<Double, Polynomial> {
@@ -150,11 +153,15 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   }
 
   private Expiring<Discrete<Boolean>> compare(DoublePredicate predicate, double threshold) {
-    final boolean currentValue = predicate.test(extract());
-    final var expiry = this.isConstant() ? NEVER : expiry(findFuturePreImage(threshold)
+    return find(t -> predicate.test(evaluate(t)), threshold);
+  }
+
+  private Expiring<Discrete<Boolean>> find(Predicate<Duration> timePredicate, double target) {
+    final boolean currentValue = timePredicate.test(ZERO);
+    final var expiry = this.isConstant() ? NEVER : expiry(findFuturePreImage(target)
         .flatMap(t -> IntStream.rangeClosed(-MAX_RANGE_FOR_ROOT_SEARCH, MAX_RANGE_FOR_ROOT_SEARCH)
             .mapToObj(i -> t.plus(EPSILON.times(i))))
-        .filter(t -> (predicate.test(evaluate(t)) ^ currentValue) && t.isPositive())
+        .filter(t -> (timePredicate.test(t) ^ currentValue) && t.isPositive())
         .findFirst());
     return expiring(discrete(currentValue), expiry);
   }
@@ -173,6 +180,27 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   public Expiring<Discrete<Boolean>> lessThanOrEquals(double threshold) {
     return compare(x -> x <= threshold, threshold);
+  }
+
+  private boolean dominates$(Polynomial other) {
+    for (int i = 0; i <= Math.max(this.degree(), other.degree()); ++i) {
+      if (this.getCoefficient(i) > other.getCoefficient(i)) return true;
+      if (this.getCoefficient(i) < other.getCoefficient(i)) return false;
+    }
+    // Equal, so either answer is correct
+    return true;
+  }
+
+  private Expiring<Discrete<Boolean>> dominates(Polynomial other) {
+    return this.subtract(other).find(t -> this.step(t).dominates$(other.step(t)), 0);
+  }
+
+  public Expiring<Polynomial> min(Polynomial other) {
+    return ExpiringMonad.map(this.dominates(other), d -> d.extract() ? other : this);
+  }
+
+  public Expiring<Polynomial> max(Polynomial other) {
+    return ExpiringMonad.map(this.dominates(other), d -> d.extract() ? this : other);
   }
 
   /**

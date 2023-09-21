@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -15,11 +16,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.*;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.EPSILON;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -158,6 +161,77 @@ public class ComparisonsTest {
     check_comparison(greaterThanOrEquals(p, q), true, true);
   }
 
+  @Test
+  void extrema_of_equal_resources() {
+    setup(() -> {
+      set(p, polynomial(1, 2, -1));
+      set(q, polynomial(1, 2, -1));
+      delay(ZERO);
+    });
+
+    check_extrema(p, q, false);
+  }
+
+  @Test
+  void extrema_of_diverging_resources() {
+    setup(() -> {
+      set(p, polynomial(0, 1, -1));
+      set(q, polynomial(1, 2, 1));
+      delay(ZERO);
+    });
+
+    check_extrema(p, q, false);
+  }
+
+  @Test
+  void extrema_of_converging_resources() {
+    setup(() -> {
+      set(p, polynomial(0, 1, 1));
+      set(q, polynomial(1, 2, -1));
+      delay(ZERO);
+    });
+
+    check_extrema(p, q, true);
+  }
+
+  @Test
+  void extrema_of_equal_then_diverging_resources() {
+    setup(() -> {
+      set(p, polynomial(1, 1, -1));
+      set(q, polynomial(1, 2, 1));
+      delay(ZERO);
+    });
+
+    check_extrema(p, q, false);
+  }
+
+  @Test
+  void extrema_of_first_order_equal_then_diverging_resources() {
+    setup(() -> {
+      set(p, polynomial(1, 2, -1));
+      set(q, polynomial(1, 2, 1));
+      delay(ZERO);
+    });
+
+    check_extrema(p, q, false);
+  }
+
+  @Test
+  void extrema_of_tangent_resources() {
+    setup(() -> {
+      set(p, polynomial(0, 2, -1));
+      set(q, polynomial(2, -2, 1));
+      delay(ZERO);
+    });
+
+    // No crossover because curves are tangent at t = 1, but q still dominates p
+    check_extrema(p, q, false);
+    // Explicitly check answer at t = 1, just to be sure:
+    reset();
+    delay(SECOND);
+    check_extrema(p, q, false);
+  }
+
   private void check_comparison(Resource<Discrete<Boolean>> result, boolean expectedValue, boolean expectCrossover) {
     reset();
     var resultDynamics = result.getDynamics().getOrThrow();
@@ -169,6 +243,44 @@ public class ComparisonsTest {
       assertEquals(expectedValue, currentValue(result));
       delay(EPSILON);
       assertEquals(!expectedValue, currentValue(result));
+    }
+  }
+
+  private void check_extrema(Resource<Polynomial> expectedMin, Resource<Polynomial> expectedMax, boolean expectCrossover) {
+    reset();
+    var lrMin = min(expectedMin, expectedMax);
+    var rlMin = min(expectedMax, expectedMin);
+    var lrMax = max(expectedMin, expectedMax);
+    var rlMax = max(expectedMax, expectedMin);
+
+    var lrMinDynamics = lrMin.getDynamics();
+    var rlMinDynamics = rlMin.getDynamics();
+    var lrMaxDynamics = lrMax.getDynamics();
+    var rlMaxDynamics = rlMax.getDynamics();
+
+    // min and max are exactly symmetric
+    assertEquals(lrMinDynamics, rlMinDynamics);
+    assertEquals(lrMaxDynamics, rlMaxDynamics);
+
+    // Expiry for min and max are exactly the same
+    Expiry expiry = lrMinDynamics.getOrThrow().expiry();
+    assertEquals(expiry, lrMaxDynamics.getOrThrow().expiry());
+    // Expiry is finite iff we expect a crossover
+    assertEquals(expectCrossover, !expiry.isNever());
+
+    // Data for min and max match their corresponding arguments
+    assertEquals(currentData(expectedMin), currentData(lrMin));
+    assertEquals(currentData(expectedMax), currentData(lrMax));
+
+    if (expectCrossover) {
+      // Just before crossover, min and max still match their originally stated arguments
+      delay(expiry.value().get().minus(EPSILON));
+      assertEquals(currentData(expectedMin), currentData(lrMin));
+      assertEquals(currentData(expectedMax), currentData(lrMax));
+      // At crossover, min and max swap
+      delay(EPSILON);
+      assertEquals(currentData(expectedMax), currentData(lrMin));
+      assertEquals(currentData(expectedMin), currentData(lrMax));
     }
   }
 
