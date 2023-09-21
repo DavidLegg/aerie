@@ -42,7 +42,7 @@ class ClampedIntegralTest {
   private final CellResource<Polynomial> upperBound = cellResource(polynomial(100));
   private final Resource<Polynomial> clampedIntegral = clampedIntegrate(integrandForClampedIntegrate, 5, lowerBound, upperBound);
 
-    @Test
+  @Test
   void start_at_starting_value_and_integrand_rate() {
     Polynomial startingDynamics = currentData(clampedIntegral);
     assertEquals(polynomial(5, 1), startingDynamics);

@@ -12,6 +12,7 @@ import java.util.function.BinaryOperator;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 
 public final class CellRefV2 {
   private CellRefV2() {}
@@ -28,18 +29,23 @@ public final class CellRefV2 {
 
       @Override
       public Cell<D> duplicate(Cell<D> cell) {
-        return new Cell<>(cell.dynamics);
+        return new Cell<>(cell.initialDynamics, cell.dynamics, cell.elapsedTime);
       }
 
       @Override
       public void apply(Cell<D> cell, E effect) {
-        cell.dynamics = effect.apply(cell.dynamics);
+        cell.initialDynamics = effect.apply(cell.dynamics);
+        cell.dynamics = cell.initialDynamics;
+        cell.elapsedTime = ZERO;
       }
 
       @Override
       public void step(Cell<D> cell, Duration duration) {
-        cell.dynamics = ErrorCatchingMonad.map(cell.dynamics, d ->
-            expiring(d.data().step(duration), d.expiry().minus(duration)));
+        // Avoid accumulated round-off error in imperfect stepping
+        // by always stepping up from the initial dynamics
+        cell.elapsedTime = cell.elapsedTime.plus(duration);
+        cell.dynamics = ErrorCatchingMonad.map(cell.initialDynamics, d ->
+            expiring(d.data().step(cell.elapsedTime), d.expiry().minus(cell.elapsedTime)));
       }
 
       @Override
@@ -106,10 +112,18 @@ public final class CellRefV2 {
   }
 
   public static class Cell<D> {
+    public ErrorCatching<Expiring<D>> initialDynamics;
     public ErrorCatching<Expiring<D>> dynamics;
+    public Duration elapsedTime;
 
     public Cell(ErrorCatching<Expiring<D>> dynamics) {
+      this(dynamics, dynamics, ZERO);
+    }
+
+    public Cell(ErrorCatching<Expiring<D>> initialDynamics, ErrorCatching<Expiring<D>> dynamics, Duration elapsedTime) {
+      this.initialDynamics = initialDynamics;
       this.dynamics = dynamics;
+      this.elapsedTime = elapsedTime;
     }
   }
 }
