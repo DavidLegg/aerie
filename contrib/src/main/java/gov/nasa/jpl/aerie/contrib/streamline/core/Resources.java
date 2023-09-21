@@ -1,10 +1,12 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.framework.Scoped.EmptyDynamicCellException;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
+import java.util.List;
 import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
@@ -75,6 +77,15 @@ public final class Resources {
                 exception -> Optional.empty())
             : Optional.empty();
     };
+  }
+
+  public static <D extends Dynamics<?, D>> Condition dynamicsChange(List<Resource<D>> resources) {
+    assert resources.size() > 0;
+    var result = dynamicsChange(resources.get(0));
+    for (Resource<D> r : resources) {
+      result = result.or(dynamicsChange(r));
+    }
+    return result;
   }
 
   /**
