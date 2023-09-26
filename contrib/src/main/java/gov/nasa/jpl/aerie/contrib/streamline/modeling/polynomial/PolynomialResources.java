@@ -86,7 +86,7 @@ public final class PolynomialResources {
     // Bootstrap integral by initially using a constant "integral" resource:
     var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, clampedStartingValue);
     // This way, the cell is initialized to the correct dynamics.
-    var cell = cellResource(map(initialEffectiveIntegrand.getDynamics(), (Polynomial $) -> $.integral(currentValue(clampedStartingValue))));
+    var cell = cellResource(initialEffectiveIntegrand.getDynamics().map($ -> neverExpiring($.data().integral(currentValue(clampedStartingValue)))));
     var effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
     // Use integrand's expiry but not integral's, since we're refreshing the integral
     wheneverDynamicsChange(effectiveIntegrand, integrandDynamics -> {
