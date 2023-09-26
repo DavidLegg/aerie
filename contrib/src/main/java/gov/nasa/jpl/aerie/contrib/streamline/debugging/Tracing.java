@@ -1,5 +1,8 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
+import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
@@ -48,6 +51,39 @@ public final class Tracing {
       }
       return result;
     });
+  }
+
+  public static <D extends Dynamics<?, D>> CellResource<D> trace(String name, CellResource<D> resource) {
+    return traceFull(name, $ -> {}, resource);
+  }
+
+  public static <D extends Dynamics<?, D>> CellResource<D> trace(String name, Consumer<D> assertion, CellResource<D> resource) {
+    return traceExpiring(name, $ -> assertion.accept($.data()), resource);
+  }
+
+  public static <D extends Dynamics<?, D>> CellResource<D> traceExpiring(String name, Consumer<Expiring<D>> assertion, CellResource<D> resource) {
+    return traceFull(name, $ -> $.match(d -> {
+      assertion.accept(d);
+      return Unit.UNIT;
+    }, e -> {
+      throw new AssertionError("%s failed while computing".formatted(formatStack()), e);
+    }), resource);
+  }
+
+  public static <D extends Dynamics<?, D>> CellResource<D> traceFull(String name, Consumer<ErrorCatching<Expiring<D>>> assertion, CellResource<D> resource) {
+    return new CellResource<D>() {
+      private final Resource<D> tracedResource = traceFull(name, assertion, resource);
+
+      @Override
+      public void emit(final DynamicsEffect<D> effect) {
+        resource.emit(effect);
+      }
+
+      @Override
+      public ErrorCatching<Expiring<D>> getDynamics() {
+        return tracedResource.getDynamics();
+      }
+    };
   }
 
   public static Condition trace(String name, Condition condition) {
