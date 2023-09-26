@@ -16,19 +16,15 @@ public class Registrar {
   }
 
   public <Value> void discrete(final String name, final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {
-    // TODO: Is null the right way to deal with failure so as not to crash the simulation?
-    baseRegistrar.discrete(name, () -> resource.getDynamics().match(
-        result -> result.data().extract(),
-        error -> null), mapper);
+    // TODO: Find the right way to deal with failure so as not to crash the simulation.
+    baseRegistrar.discrete(name, () -> resource.getDynamics().getOrThrow().data().extract(), mapper);
   }
 
   public void real(final String name, final Resource<Linear> resource) {
-    // TODO: Is null the right way to deal with failure so as not to crash the simulation?
-    baseRegistrar.real(name, () -> resource.getDynamics().match(
-        result -> {
-          var linearDynamics = result.data();
-          return RealDynamics.linear(linearDynamics.extract(), linearDynamics.rate());
-        },
-        error -> null));
+    // TODO: Find the right way to deal with failure so as not to crash the simulation.
+    baseRegistrar.real(name, () -> {
+      var linearDynamics = resource.getDynamics().getOrThrow().data();
+      return RealDynamics.linear(linearDynamics.extract(), linearDynamics.rate());
+    });
   }
 }

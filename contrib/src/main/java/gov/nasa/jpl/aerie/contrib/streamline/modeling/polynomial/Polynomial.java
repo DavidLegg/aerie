@@ -38,6 +38,9 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   public static Polynomial polynomial(double... coefficients) {
     int n = coefficients.length;
+    if (n == 0) {
+      return new Polynomial(new double[] { 0.0 });
+    }
     while (n > 1 && coefficients[n - 1] == 0) --n;
     final double[] newCoefficients = Arrays.copyOf(coefficients, n);
     return new Polynomial(newCoefficients);
