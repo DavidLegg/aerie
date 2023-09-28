@@ -35,7 +35,7 @@ public final class InMemoryResultsCellRepository implements ResultsCellRepositor
   }
 
   @Override
-  public ResultsProtocol.OwnerRole allocate(final PlanId planId) {
+  public ResultsProtocol.OwnerRole allocate(final PlanId planId, final String requestedBy) {
     try {
       final var planRevision = planRepository.getPlanRevision(planId);
       final var cell = new InMemoryCell(planId, planRevision);
@@ -127,6 +127,11 @@ public final class InMemoryResultsCellRepository implements ResultsCellRepositor
       }
 
       this.state = new ResultsProtocol.State.Failed(0, reason);
+    }
+
+    @Override
+    public void reportSimulationExtent(final Duration extent) {
+      System.out.println("Simulation extent: " + extent);
     }
 
     public boolean isEqualTo(final InMemoryCell other) {

@@ -38,6 +38,7 @@ public final class MerlinWorkerAppDriver {
     hikariConfig.addDataSourceProperty("applicationName", "Merlin Server");
     hikariConfig.setUsername(postgresStore.user());
     hikariConfig.setPassword(postgresStore.password());
+    hikariConfig.setMaximumPoolSize(2);
 
     hikariConfig.setConnectionInitSql("set time zone 'UTC'");
 
@@ -51,9 +52,10 @@ public final class MerlinWorkerAppDriver {
     final var missionModelController = new LocalMissionModelService(
         configuration.merlinFileStore(),
         stores.missionModels(),
-        configuration.untruePlanStart());
+        configuration.untruePlanStart()
+    );
     final var planController = new LocalPlanService(stores.plans());
-    final var simulationAgent = new SynchronousSimulationAgent(planController, missionModelController);
+    final var simulationAgent = new SynchronousSimulationAgent(planController, missionModelController, configuration.simulationProgressPollPeriodMillis());
 
     final var notificationQueue = new LinkedBlockingQueue<PostgresSimulationNotificationPayload>();
     final var listenAction = new ListenSimulationCapability(hikariDataSource, notificationQueue);
@@ -101,6 +103,7 @@ public final class MerlinWorkerAppDriver {
                           Integer.parseInt(getEnv("MERLIN_WORKER_DB_PORT", "5432")),
                           getEnv("MERLIN_WORKER_DB_PASSWORD", ""),
                           getEnv("MERLIN_WORKER_DB", "aerie_merlin")),
+        Integer.parseInt(getEnv("SIMULATION_PROGRESS_POLL_PERIOD_MILLIS", "5000")),
         Instant.parse(getEnv("UNTRUE_PLAN_START", ""))
     );
   }

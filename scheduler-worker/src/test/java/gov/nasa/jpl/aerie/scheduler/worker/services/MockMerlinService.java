@@ -1,14 +1,5 @@
 package gov.nasa.jpl.aerie.scheduler.worker.services;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
 import gov.nasa.jpl.aerie.merlin.driver.ActivityDirective;
 import gov.nasa.jpl.aerie.merlin.driver.ActivityDirectiveId;
 import gov.nasa.jpl.aerie.merlin.driver.SimulationResults;
@@ -16,29 +7,46 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.DurationType;
 import gov.nasa.jpl.aerie.merlin.protocol.types.SerializedValue;
 import gov.nasa.jpl.aerie.scheduler.TimeUtility;
-import gov.nasa.jpl.aerie.scheduler.model.*;
+import gov.nasa.jpl.aerie.scheduler.model.Plan;
+import gov.nasa.jpl.aerie.scheduler.model.PlanningHorizon;
+import gov.nasa.jpl.aerie.scheduler.model.Problem;
 import gov.nasa.jpl.aerie.scheduler.model.SchedulingActivityDirective;
+import gov.nasa.jpl.aerie.scheduler.model.SchedulingActivityDirectiveId;
 import gov.nasa.jpl.aerie.scheduler.server.models.DatasetId;
+import gov.nasa.jpl.aerie.scheduler.server.models.ExternalProfiles;
 import gov.nasa.jpl.aerie.scheduler.server.models.GoalId;
 import gov.nasa.jpl.aerie.scheduler.server.models.MerlinPlan;
 import gov.nasa.jpl.aerie.scheduler.server.models.MissionModelId;
 import gov.nasa.jpl.aerie.scheduler.server.models.PlanId;
 import gov.nasa.jpl.aerie.scheduler.server.models.PlanMetadata;
-import gov.nasa.jpl.aerie.scheduler.server.services.GraphQLMerlinService;
-import gov.nasa.jpl.aerie.scheduler.server.services.MissionModelService;
-import gov.nasa.jpl.aerie.scheduler.server.services.PlanService;
-import gov.nasa.jpl.aerie.scheduler.server.services.PlanServiceException;
+import gov.nasa.jpl.aerie.scheduler.server.models.ResourceType;
+import gov.nasa.jpl.aerie.scheduler.server.services.MerlinService;
 import org.apache.commons.lang3.tuple.Pair;
 
-class MockMerlinService implements MissionModelService, PlanService.OwnerRole {
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+class MockMerlinService implements MerlinService.OwnerRole {
 
   private Optional<PlanningHorizon> planningHorizon;
+  private ExternalProfiles externalProfiles = new ExternalProfiles(Map.of(), Map.of(), List.of());
 
-  record MissionModelInfo(Path libPath, Path modelPath, String modelName, MissionModelTypes types, Map<String, SerializedValue> config) {}
+  public void setExternalDataset(ExternalProfiles externalProfiles) {
+    this.externalProfiles = externalProfiles;
+  }
+
+  record MissionModelInfo(Path libPath, Path modelPath, String modelName, MerlinService.MissionModelTypes types, Map<String, SerializedValue> config) {}
 
   private Optional<MissionModelInfo> missionModelInfo = Optional.empty();
   private MerlinPlan initialPlan;
   Collection<ActivityDirective> updatedPlan;
+  Plan plan;
 
   MockMerlinService() {
     this.initialPlan = new MerlinPlan();
@@ -120,6 +128,7 @@ class MockMerlinService implements MissionModelService, PlanService.OwnerRole {
   )
   {
     this.updatedPlan = extractActivityDirectives(plan);
+    this.plan = plan;
     final var res = new HashMap<SchedulingActivityDirective, ActivityDirectiveId>();
     for (final var activity : plan.getActivities()) {
       res.put(activity, new ActivityDirectiveId(activity.id().id()));
@@ -130,6 +139,23 @@ class MockMerlinService implements MissionModelService, PlanService.OwnerRole {
   @Override
   public void ensurePlanExists(final PlanId planId) {
 
+  }
+
+  @Override
+  public Optional<SimulationResults> getSimulationResults(final PlanMetadata planMetadata)
+  {
+    return Optional.empty();
+  }
+
+  @Override
+  public ExternalProfiles getExternalProfiles(final PlanId planId) {
+    return externalProfiles;
+  }
+
+  @Override
+  public Collection<ResourceType> getResourceTypes(final PlanId planId)
+  {
+    return null;
   }
 
   @Override
@@ -158,14 +184,14 @@ class MockMerlinService implements MissionModelService, PlanService.OwnerRole {
   }
 
   @Override
-  public MissionModelTypes getMissionModelTypes(final PlanId planId)
+  public MerlinService.MissionModelTypes getMissionModelTypes(final PlanId planId)
   {
     if (this.missionModelInfo.isEmpty()) throw new RuntimeException("Make sure to call setMissionModel before running a test");
     return this.missionModelInfo.get().types();
   }
 
   @Override
-  public MissionModelTypes getMissionModelTypes(final MissionModelId missionModelId)
+  public MerlinService.MissionModelTypes getMissionModelTypes(final MissionModelId missionModelId)
   {
     if (this.missionModelInfo.isEmpty()) throw new RuntimeException("Make sure to call setMissionModel before running a test");
     return this.missionModelInfo.get().types();

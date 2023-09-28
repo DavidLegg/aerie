@@ -22,11 +22,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class PermissionsTest {
   private static final File initSqlScriptFile = new File("../merlin-server/sql/merlin/init.sql");
+  private static final String testRole = "testRole";
   private enum FunctionPermissionKey {
-      apply_preset, branch_plan, create_merge_rq, withdraw_merge_rq, begin_merge, cancel_merge,
-      commit_merge, deny_merge, get_conflicting_activities, get_non_conflicting_activities, set_resolution,
-      set_resolution_bulk, delete_activity_subtree, delete_activity_subtree_bulk, delete_activity_reanchor_plan,
-      delete_activity_reanchor_plan_bulk, delete_activity_reanchor, delete_activity_reanchor_bulk, get_plan_history
+    apply_preset,
+    begin_merge,
+    branch_plan,
+    cancel_merge,
+    create_merge_rq,
+    create_snapshot,
+    commit_merge,
+    delete_activity_reanchor,
+    delete_activity_reanchor_bulk,
+    delete_activity_reanchor_plan,
+    delete_activity_reanchor_plan_bulk,
+    delete_activity_subtree,
+    delete_activity_subtree_bulk,
+    deny_merge,
+    get_conflicting_activities,
+    get_non_conflicting_activities,
+    get_plan_history,
+    restore_activity_changelog,
+    restore_snapshot,
+    set_resolution,
+    set_resolution_bulk,
+    withdraw_merge_rq
   }
   private enum GeneralPermission {
     OWNER, MISSION_MODEL_OWNER, PLAN_OWNER, PLAN_COLLABORATOR, PLAN_OWNER_COLLABORATOR
@@ -53,22 +72,12 @@ public class PermissionsTest {
   void afterEach() throws SQLException {
     helper.clearTable("uploaded_file");
     helper.clearTable("mission_model");
+    helper.clearTable("activity_type");
     helper.clearTable("plan");
+    helper.clearTable("plan_collaborators");
     helper.clearTable("activity_directive");
-    helper.clearTable("simulation_template");
     helper.clearTable("simulation");
     helper.clearTable("dataset");
-    helper.clearTable("plan_dataset");
-    helper.clearTable("simulation_dataset");
-    helper.clearTable("plan_snapshot");
-    helper.clearTable("plan_latest_snapshot");
-    helper.clearTable("plan_snapshot_activities");
-    helper.clearTable("plan_snapshot_parent");
-    helper.clearTable("merge_request");
-    helper.clearTable("merge_staging_area");
-    helper.clearTable("conflicting_activities");
-    helper.clearTable("anchor_validation_status");
-    helper.clearTable("plan_collaborators");
   }
 
   @BeforeAll
@@ -81,6 +90,7 @@ public class PermissionsTest {
     helper.startDatabase();
     connection = helper.connection();
     merlinHelper = new MerlinDatabaseTestHelper(connection);
+    insertUserRole(testRole);
   }
 
   @AfterAll
@@ -143,6 +153,54 @@ public class PermissionsTest {
         """.formatted(permission, planIdReceiving, planIdSupplying, username));
     }
   }
+
+  private void insertUserRole(String role) throws SQLException {
+    try(final var statement = connection.createStatement()){
+      statement.execute(
+        //language=sql
+        """
+        insert into metadata.user_roles(role, description)
+        values ('%s', 'A role created during DBTests');
+        """.formatted(role));
+    }
+  }
+
+  private void updateUserRolePermissions(
+      String role,
+      String actionPermissionsJson,
+      String functionPermissionsJson)
+  throws SQLException {
+    try(final var statement = connection.createStatement()){
+      if(actionPermissionsJson == null){
+        statement.execute(
+        //language=sql
+        """
+        update metadata.user_role_permission
+        set function_permissions = '%s'::jsonb
+        where role = '%s';
+        """.formatted(functionPermissionsJson, role));
+      } else if (functionPermissionsJson == null) {
+        statement.execute(
+        //language=sql
+        """
+        update metadata.user_role_permission
+        set action_permissions = '%s'::jsonb
+        where role = '%s';
+        """.formatted(actionPermissionsJson, role));
+      }
+      else {
+        statement.execute(
+        //language=sql
+        """
+        update metadata.user_role_permission
+        set action_permissions = '%s'::jsonb,
+            function_permissions = '%s'::jsonb
+        where role = '%s';
+        """.formatted(actionPermissionsJson, functionPermissionsJson, role));
+      }
+
+    }
+  }
   //endregion
 
   @Test
@@ -175,24 +233,27 @@ public class PermissionsTest {
     @Test
     void getFunctionReturnsAssignedValueUser() throws SQLException {
       assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("apply_preset", merlinHelper.user.session()));
-      assertEquals("NO_CHECK", getFunctionPermission("branch_plan", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_SOURCE", getFunctionPermission("create_merge_rq", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_SOURCE", getFunctionPermission("withdraw_merge_rq", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("begin_merge", merlinHelper.user.session()));
+      assertEquals("NO_CHECK", getFunctionPermission("branch_plan", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("cancel_merge", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_SOURCE", getFunctionPermission("create_merge_rq", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("create_snapshot", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("commit_merge", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_bulk", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_plan", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_plan_bulk", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_subtree", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_subtree_bulk", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("deny_merge", merlinHelper.user.session()));
       assertEquals("NO_CHECK", getFunctionPermission("get_conflicting_activities", merlinHelper.user.session()));
       assertEquals("NO_CHECK", getFunctionPermission("get_non_conflicting_activities", merlinHelper.user.session()));
+      assertEquals("NO_CHECK", getFunctionPermission("get_plan_history", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("restore_activity_changelog", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("restore_snapshot", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("set_resolution", merlinHelper.user.session()));
       assertEquals("PLAN_OWNER_TARGET", getFunctionPermission("set_resolution_bulk", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_subtree", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_subtree_bulk", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_plan", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_plan_bulk", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor", merlinHelper.user.session()));
-      assertEquals("PLAN_OWNER_COLLABORATOR", getFunctionPermission("delete_activity_reanchor_bulk", merlinHelper.user.session()));
-      assertEquals("NO_CHECK", getFunctionPermission("get_plan_history", merlinHelper.user.session()));
+      assertEquals("PLAN_OWNER_SOURCE", getFunctionPermission("withdraw_merge_rq", merlinHelper.user.session()));
     }
 
     @ParameterizedTest
@@ -423,7 +484,7 @@ public class PermissionsTest {
 
     // MISSION_MODEL_OWNER: The user must be Owner of the model
     @Test
-    void testMissionModel() throws SQLException {
+    void testMissionModelOwner() throws SQLException {
       // Setup
       final int missionModelId = merlinHelper.insertMissionModel(fileId, merlinHelper.user.name());
       final int basePlan = merlinHelper.insertPlan(missionModelId, merlinHelper.viewer.name());
@@ -724,6 +785,239 @@ public class PermissionsTest {
           + "' is not PLAN_OWNER_COLLABORATOR on Target Plan " + userPlan)) {
         throw ex;
       }
+    }
+  }
+
+  @Nested
+  class UserRolePermissionsValidation{
+    private final String invalidJsonTextErrCode = "22032";
+    @Test
+    void emptyIsValid() {
+      // Action
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, "{}", null));
+      // Function
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, null, "{}"));
+      // Both
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, "{}", "{}"));
+    }
+
+    @Test
+    void nonsenseKeys() throws SQLException {
+      // Nonsense Values for Keys are caught
+      final String actionPermissions = "{\"fake_action_key\": \"NO_CHECK\"}";
+      final String functionPermissions = "{\"fake_function_key\": \"NO_CHECK\"}";
+      // Action
+      final String actionExceptionMsg =
+          """
+          ERROR: invalid keys in supplied row
+            Detail: The following action keys are not valid: fake_action_key
+            Hint:
+          """.trim();
+      final var actionException = assertThrows(SQLException.class,
+                                               () -> updateUserRolePermissions(testRole, actionPermissions, null));
+      if( !actionException.getMessage().contains(actionExceptionMsg)
+         || !actionException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw actionException;
+      }
+
+      // Function
+      final String fnExceptionMsg =
+          """
+          ERROR: invalid keys in supplied row
+            Detail: The following function keys are not valid: fake_function_key
+            Hint:
+          """.trim();
+      final var fnException = assertThrows(SQLException.class,
+                                           () -> updateUserRolePermissions(testRole, null, functionPermissions));
+      if(!fnException.getMessage().contains(fnExceptionMsg)
+         || !fnException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw fnException;
+      }
+      // Both
+      final String bothExceptionMsg =
+          """
+          ERROR: invalid keys in supplied row
+            Detail: The following action keys are not valid: fake_action_key
+          The following function keys are not valid: fake_function_key
+            Hint:
+          """.trim();
+      final var bothException = assertThrows(SQLException.class,
+                                             () -> updateUserRolePermissions(testRole, actionPermissions, functionPermissions));
+      if(!bothException.getMessage().contains(bothExceptionMsg)
+         || !bothException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw bothException;
+      }
+    }
+
+    @Test
+    void nonsensePermissions() throws SQLException {
+      // Nonsense Values for Permissions are caught
+      final String actionPermissions = "{\"simulate\": \"NONSENSE_PERMISSION\"}";
+      final String functionPermissions = "{\"begin_merge\": \"NONSENSE_PERMISSION\"}";
+      // Action
+      final String actionExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following action keys have invalid permissions: {simulate: NONSENSE_PERMISSION}
+            Hint:
+          """.trim();
+      final var actionException = assertThrows(SQLException.class,
+                                               () -> updateUserRolePermissions(testRole, actionPermissions, null));
+      if( !actionException.getMessage().contains(actionExceptionMsg)
+         || !actionException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw actionException;
+      }
+
+      // Function
+      final String fnExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following function keys have invalid permissions: {begin_merge: NONSENSE_PERMISSION}
+            Hint:
+          """.trim();
+      final var fnException = assertThrows(SQLException.class,
+                                           () -> updateUserRolePermissions(testRole, null, functionPermissions));
+      if(!fnException.getMessage().contains(fnExceptionMsg)
+         || !fnException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw fnException;
+      }
+      // Both
+      final String bothExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following action keys have invalid permissions: {simulate: NONSENSE_PERMISSION}
+          The following function keys have invalid permissions: {begin_merge: NONSENSE_PERMISSION}
+            Hint:
+          """.trim();
+      final var bothException = assertThrows(SQLException.class,
+                                             () -> updateUserRolePermissions(testRole, actionPermissions, functionPermissions));
+      if(!bothException.getMessage().contains(bothExceptionMsg)
+         || !bothException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw bothException;
+      }
+    }
+
+    @Test
+    void invalidPermissions() throws SQLException {
+      // Improperly applied Plan Merge Permissions are caught
+      final String actionPermissions = "{\"simulate\": \"PLAN_OWNER_SOURCE\"}";
+      final String functionPermissions = "{\"apply_preset\": \"PLAN_OWNER_TARGET\"}";
+      // Action
+      final String actionExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following action keys may not take plan merge permissions: {simulate: PLAN_OWNER_SOURCE}
+            Hint:
+          """.trim();
+      final var actionException = assertThrows(SQLException.class,
+                                               () -> updateUserRolePermissions(testRole, actionPermissions, null));
+      if( !actionException.getMessage().contains(actionExceptionMsg)
+         || !actionException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw actionException;
+      }
+
+      // Function
+      final String fnExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following function keys may not take plan merge permissions: {apply_preset: PLAN_OWNER_TARGET}
+            Hint:
+          """.trim();
+      final var fnException = assertThrows(SQLException.class,
+                                           () -> updateUserRolePermissions(testRole, null, functionPermissions));
+      if(!fnException.getMessage().contains(fnExceptionMsg)
+         || !fnException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw fnException;
+      }
+      // Both
+      final String bothExceptionMsg =
+          """
+          ERROR: invalid permissions in supplied row
+            Detail: The following action keys may not take plan merge permissions: {simulate: PLAN_OWNER_SOURCE}
+          The following function keys may not take plan merge permissions: {apply_preset: PLAN_OWNER_TARGET}
+            Hint:
+          """.trim();
+      final var bothException = assertThrows(SQLException.class,
+                                             () -> updateUserRolePermissions(testRole, actionPermissions, functionPermissions));
+      if(!bothException.getMessage().contains(bothExceptionMsg)
+         || !bothException.getSQLState().equals(invalidJsonTextErrCode)){
+        throw bothException;
+      }
+    }
+
+    @Test
+    void incompleteIsValid() {
+      // Updates Viewer Role Permissions, which is an incomplete set
+      final String actionPermissions = """
+      {
+        "sequence_seq_json_bulk": "NO_CHECK",
+        "resource_samples": "NO_CHECK"
+      }
+      """;
+      final String functionPermissions = """
+      {
+        "get_conflicting_activities": "NO_CHECK",
+        "get_non_conflicting_activities": "NO_CHECK",
+        "get_plan_history": "NO_CHECK"
+      }
+      """;
+      // Action
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, actionPermissions, null));
+      // Function
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, null, functionPermissions));
+      // Both
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, actionPermissions, functionPermissions));
+    }
+
+    @Test
+    void completeIsValid() {
+      // Uses User Role Permissions to check that a complete set is valid
+      // and that plan merge permissions on plan merge functions is valid
+      final String actionPermissions = """
+          {
+            "check_constraints": "PLAN_OWNER_COLLABORATOR",
+            "create_expansion_rule": "NO_CHECK",
+            "create_expansion_set": "NO_CHECK",
+            "expand_all_activities": "NO_CHECK",
+            "insert_ext_dataset": "PLAN_OWNER",
+            "resource_samples": "NO_CHECK",
+            "schedule":"PLAN_OWNER_COLLABORATOR",
+            "sequence_seq_json_bulk": "NO_CHECK",
+            "simulate":"PLAN_OWNER_COLLABORATOR"
+          }
+          """;
+      final String functionPermissions = """
+          {
+            "apply_preset": "PLAN_OWNER_COLLABORATOR",
+            "begin_merge": "PLAN_OWNER_TARGET",
+            "branch_plan": "NO_CHECK",
+            "cancel_merge": "PLAN_OWNER_TARGET",
+            "commit_merge": "PLAN_OWNER_TARGET",
+            "create_merge_rq": "PLAN_OWNER_SOURCE",
+            "create_snapshot": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_reanchor": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_reanchor_bulk": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_reanchor_plan": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_reanchor_plan_bulk": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_subtree": "PLAN_OWNER_COLLABORATOR",
+            "delete_activity_subtree_bulk": "PLAN_OWNER_COLLABORATOR",
+            "deny_merge": "PLAN_OWNER_TARGET",
+            "get_conflicting_activities": "NO_CHECK",
+            "get_non_conflicting_activities": "NO_CHECK",
+            "get_plan_history": "NO_CHECK",
+            "restore_activity_changelog": "PLAN_OWNER_COLLABORATOR",
+            "restore_snapshot": "PLAN_OWNER_COLLABORATOR",
+            "set_resolution": "PLAN_OWNER_TARGET",
+            "set_resolution_bulk": "PLAN_OWNER_TARGET",
+            "withdraw_merge_rq": "PLAN_OWNER_SOURCE"
+          }
+          """;
+      // Action
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, actionPermissions, null));
+      // Function
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, null, functionPermissions));
+      // Both
+      assertDoesNotThrow(() -> updateUserRolePermissions(testRole, actionPermissions, functionPermissions));
     }
   }
 }

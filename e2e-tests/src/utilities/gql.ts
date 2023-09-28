@@ -185,8 +185,8 @@ const gql = {
   `,
 
   GET_SCHEDULING_DSL_TYPESCRIPT: `#graphql
-    query GetSchedulingDslTypeScript($missionModelId: Int!) {
-      schedulingDslTypescript(missionModelId: $missionModelId) {
+    query GetSchedulingDslTypeScript($missionModelId: Int!, $planId: Int) {
+      schedulingDslTypescript(missionModelId: $missionModelId, planId: $planId) {
         reason
         status
         typescriptFiles {
@@ -271,6 +271,46 @@ const gql = {
         startTime: start_time
       }
     }
+  `,
+
+  INSERT_SPAN:`#graphql
+  mutation InsertSpan(
+    $parentId: Int!,
+    $duration: interval,
+    $datasetId: Int!,
+    $type: String,
+    $startOffset: interval,
+    $attributes: jsonb
+  ){
+  insert_span_one(object: {parent_id: $parentId, duration: $duration, dataset_id: $datasetId, type: $type, start_offset: $startOffset, attributes: $attributes}) {
+    id
+  }
+}
+`,
+
+INSERT_SIMULATION_DATASET:`#graphql
+    mutation InsertSimulationDataset($simulationDatasetInsertInput:simulation_dataset_insert_input!
+      ){
+      insert_simulation_dataset_one(object: $simulationDatasetInsertInput) {
+        dataset_id
+      }
+    }
+  `,
+
+  INSERT_PROFILE: `#graphql
+  mutation insertProfile($datasetId: Int!, $duration:interval, $name:String, $type:jsonb){
+    insert_profile_one(object: {dataset_id: $datasetId, duration: $duration, name: $name, type: $type}) {
+      id
+    }
+  }
+  `,
+
+  INSERT_PROFILE_SEGMENT:`#graphql
+  mutation insertProfileSegment($datasetId: Int!, $dynamics:jsonb, $isGap: Boolean, $profileId:Int!, $startOffset:interval){
+    insert_profile_segment_one(object: {dataset_id: $datasetId, dynamics: $dynamics, is_gap: $isGap, profile_id: $profileId, start_offset: $startOffset}){
+      dataset_id
+    }
+  }
   `,
 
   INSERT_SIMULATION_TEMPLATE: `#graphql
@@ -378,7 +418,21 @@ const gql = {
   CHECK_CONSTRAINTS: `#graphql
     query checkConstraints($planId: Int!, $simulationDatasetId: Int) {
       constraintViolations(planId: $planId, simulationDatasetId: $simulationDatasetId) {
-        violations
+        constraintId
+        constraintName
+        type
+        resourceIds
+        violations {
+          activityInstanceIds
+          windows {
+            start
+            end
+          }
+        }
+        gaps {
+          start
+          end
+        }
       }
     }
   `,
@@ -398,7 +452,7 @@ const gql = {
         constraint_id
         simulation_dataset_id
         definition_outdated
-        violations
+        results
       }
     }
   `,
@@ -431,6 +485,57 @@ const gql = {
     }
   `,
 
+  CREATE_USER: `#graphql
+    mutation createUser($user: users_insert_input!, $allowed_roles: [users_allowed_roles_insert_input!]!) {
+      insert_users_one(object: $user) {
+        default_role
+        username
+      }
+      insert_users_allowed_roles(objects: $allowed_roles) {
+        returning {
+          allowed_role
+          username
+        }
+      }
+    }
+  `,
+
+  DELETE_USER: `#graphql
+    mutation deleteUser($username: String!) {
+      delete_users_by_pk(username: $username) {
+        username
+        default_role
+      }
+    }
+  `,
+
+  ADD_PLAN_COLLABORATOR: `#graphql
+    mutation addPlanCollaborator($collaborator: plan_collaborators_insert_input!) {
+      insert_plan_collaborators_one(object: $collaborator) {
+        collaborator
+        plan_id
+      }
+    }
+  `,
+
+  GET_ROLE_ACTION_PERMISSIONS: `#graphl
+    query getRolePermissions($role: user_roles_enum!){
+      permissions: user_role_permission_by_pk(role: $role) {
+        action_permissions
+      }
+    }
+  `,
+
+  UPDATE_ROLE_ACTION_PERMISSIONS: `#graphl
+    mutation updateRolePermissions($role: user_roles_enum!, $action_permissions: jsonb!) {
+      permissions: update_user_role_permission_by_pk(
+        pk_columns: {role: $role},
+        _set: {action_permissions: $action_permissions})
+      {
+        action_permissions
+      }
+    }
+  `
 };
 
 export default gql;

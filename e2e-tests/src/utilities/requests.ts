@@ -10,8 +10,8 @@ import time from './time.js';
  * Aerie API request functions.
  */
 const req = {
-  async createMissionModel(request: APIRequestContext, model: MissionModelInsertInput): Promise<number> {
-    const data = await req.hasura(request, gql.CREATE_MISSION_MODEL, { model: model });
+  async createMissionModel(request: APIRequestContext, model: MissionModelInsertInput, headers?: Record<string, string>): Promise<number> {
+    const data = await req.hasura(request, gql.CREATE_MISSION_MODEL, { model: model }, headers);
     const { insert_mission_model_one } = data;
     const { id: mission_model_id } = insert_mission_model_one;
 
@@ -126,8 +126,8 @@ const req = {
     }
   },
 
-  async createPlan(request: APIRequestContext, model: CreatePlanInput): Promise<number> {
-    const data = await req.hasura(request, gql.CREATE_PLAN, { plan: model });
+  async createPlan(request: APIRequestContext, model: CreatePlanInput, headers?: Record<string, string>): Promise<number> {
+    const data = await req.hasura(request, gql.CREATE_PLAN, { plan: model }, headers);
     const { insert_plan_one } = data;
     const { id: plan_id } = insert_plan_one;
     return plan_id;
@@ -150,6 +150,53 @@ const req = {
     const data = await req.hasura(request, gql.GET_SIMULATION_DATASET_BY_DATASET_ID, { id: simulationDatasetId });
     const { simulation_dataset } = data;
     return simulation_dataset[0] as SimulationDataset;
+  },
+
+  async insertSpan(
+      request: APIRequestContext,
+      parentId: number,
+      duration: string,
+      simulationDatasetId: number,
+      type: string,
+      startOffset: string,
+      attributes: any){
+    //note the empty headers: required to act as hasura admin role to be able to insert in these tables
+    const data = await req.hasura(request, gql.INSERT_SPAN, {
+      parentId: parentId,
+      duration: duration,
+      datasetId: simulationDatasetId,
+      type: type,
+      startOffset: startOffset,
+      attributes: attributes},{});
+    const { insert_span_one } = data;
+    const { id } = insert_span_one;
+    return id;
+  },
+
+  async insertSimulationDataset(
+      request: APIRequestContext,
+      simulationId: number,
+      simulationStartTime: string,
+      simulationEndTime:string,
+      status:string,
+      simulationArguments:ArgumentsMap,
+      planRevision: number
+
+  ){
+    //note the empty headers: required to act as hasura admin role to be able to insert in these tables
+    const data = await req.hasura(request, gql.INSERT_SIMULATION_DATASET, {
+      simulationDatasetInsertInput : {
+        simulation_id: simulationId,
+        simulation_start_time:simulationStartTime,
+        simulation_end_time: simulationEndTime,
+        status:status,
+        arguments: simulationArguments,
+        plan_revision: planRevision
+      }
+    },{});
+    const { insert_simulation_dataset_one } = data;
+    const { dataset_id : datasetId } = insert_simulation_dataset_one;
+    return datasetId;
   },
 
   async insertAndAssociateSimulationTemplate(
@@ -231,8 +278,9 @@ const req = {
   async getSchedulingDslTypeScript(
     request: APIRequestContext,
     missionModelId: number,
+    planId?: number
   ): Promise<SchedulingDslTypesResponse> {
-    const data = await req.hasura(request, gql.GET_SCHEDULING_DSL_TYPESCRIPT, { missionModelId: missionModelId });
+    const data = await req.hasura(request, gql.GET_SCHEDULING_DSL_TYPESCRIPT, { missionModelId: missionModelId, planId: planId });
     const { schedulingDslTypescript } = data;
     return schedulingDslTypescript;
   },
@@ -330,6 +378,22 @@ const req = {
     return id;
   },
 
+  async insertProfile(request: APIRequestContext, datasetId: number, duration:string, name: string, type:object): Promise<number> {
+    //note the empty headers: required to act as hasura admin role to be able to insert in these tables
+    const data = await req.hasura(request, gql.INSERT_PROFILE, { datasetId, duration, name, type }, {});
+    const { insert_profile_one } = data;
+    const { id } = insert_profile_one;
+    return id;
+  },
+
+  async insertProfileSegment(request: APIRequestContext, datasetId: number, dynamics:number, isGap: boolean, profileId:number, startOffset:string): Promise<number> {
+    //note the empty headers: required to act as hasura admin role to be able to insert in these tables
+    const data = await req.hasura(request, gql.INSERT_PROFILE_SEGMENT, { datasetId, dynamics, isGap, profileId, startOffset }, {});
+    const { insert_profile_segment_one } = data;
+    const { dataset_id } = insert_profile_segment_one;
+    return dataset_id;
+  },
+
   async updateConstraint(
     request: APIRequestContext,
     constraintId: number,
@@ -345,11 +409,10 @@ const req = {
     request: APIRequestContext,
     planId: number,
     simulationDatasetId?: number,
-  ): Promise<ConstraintViolation[]> {
+  ): Promise<ConstraintResult[]> {
     const data = await req.hasura(request, gql.CHECK_CONSTRAINTS, { planId, simulationDatasetId });
     const { constraintViolations } = data;
-    const { violations } = constraintViolations;
-    return <ConstraintViolation[]>violations;
+    return <ConstraintResult[]> constraintViolations;
   },
 
   async deleteConstraint(request: APIRequestContext, constraintId: number): Promise<number> {
@@ -385,6 +448,34 @@ const req = {
     const { constraint_run } = data;
     return constraint_run;
   },
+
+  // User-related requests
+  async createUser(request: APIRequestContext, user: User): Promise<void> {
+    const userInput: UserInsert = {username: user.username, default_role: user.default_role};
+    const allowedRolesInput: UserAllowedRole[] = user.allowed_roles.map(role => { return {username: user.username, allowed_role: role}})
+    await req.hasura(request, gql.CREATE_USER, { user: userInput, allowed_roles: allowedRolesInput } )
+  },
+
+  async deleteUser(request: APIRequestContext, username: string): Promise<void> {
+    await req.hasura(request, gql.DELETE_USER, { username })
+  },
+
+  async addPlanCollaborator(request: APIRequestContext, username: string, planId: number): Promise<void> {
+    const planCollaboratorInsertInput = {planId: planId, collaborator: username};
+    await req.hasura(request, gql.ADD_PLAN_COLLABORATOR, { planCollaboratorInsertInput });
+  },
+
+  async getActionPermissionsForRole(request: APIRequestContext, role: string): Promise<ActionPermissionSet> {
+    const data = await req.hasura(request, gql.GET_ROLE_ACTION_PERMISSIONS, { role });
+    const { permissions } = data;
+    const { action_permissions } = permissions;
+    return action_permissions;
+  },
+
+  async updateActionPermissionsForRole(request: APIRequestContext, role: string, permissions: ActionPermissionSet): Promise<void> {
+    const strippedPermissions = Object.fromEntries(Object.entries(permissions).filter(([_, v]) => v != null));
+    await req.hasura(request, gql.UPDATE_ROLE_ACTION_PERMISSIONS, { role: role, action_permissions: strippedPermissions });
+  }
 };
 /**
  * Converts any activity to an Activity.
@@ -420,6 +511,27 @@ export async function awaitSimulation(request: APIRequestContext, plan_id: numbe
   }
 
   throw Error(`Simulation timed out after ${max_iter} iterations`);
+}
+
+export async function awaitScheduling(request: APIRequestContext, scheduling_specification_id: number): Promise<SchedulingResponse> {
+  const max_iter = 10;
+  for (let i = 0; i < max_iter; i++) {
+    const resp = await req.schedule(request, scheduling_specification_id);
+    const { reason, status } = resp;
+
+    switch (status) {
+      case 'pending':
+      case 'incomplete':
+        await time.delay(1000);
+        break;
+      case 'complete':
+        return resp;
+      default:
+        throw Error(`Scheduling returned bad status: ${status} with reason ${reason}`);
+    }
+  }
+
+  throw Error(`Scheduling timed out after ${max_iter} iterations`);
 }
 
 export default req;

@@ -62,6 +62,7 @@ describe('sequence generation', () => {
   let expansionId1: number;
   let expansionId2: number;
   let expansionId3: number;
+  let expansionId4: number;
 
   beforeEach(async () => {
     expansionId1 = await insertExpansion(
@@ -83,7 +84,7 @@ describe('sequence generation', () => {
       `
     export default function SingleCommandExpansion(props: { activityInstance: ActivityType }): ExpansionReturn {
       return [
-        C.PREHEAT_OVEN({ temperature: 70 }),
+        C.PREHEAT_OVEN(70),
         C.BAKE_BREAD,
         C.PREPARE_LOAF({ tb_sugar: 50, gluten_free: "FALSE" }),
       ];
@@ -100,7 +101,7 @@ describe('sequence generation', () => {
         A(Temporal.Instant.from("2025-12-24T12:01:59Z")).PREHEAT_OVEN({ temperature: 360 }),
         R\`00:15:30\`.PREHEAT_OVEN({ temperature: 425 }),
         R(Temporal.Duration.from({ hours: 1, minutes: 15, seconds: 30 })).EAT_BANANA,
-        E(Temporal.Duration.from({ days: -1, hours: -12, minutes: -16, seconds: -54 })).PREPARE_LOAF({ tb_sugar: 50, gluten_free: "FALSE" }),
+        E(Temporal.Duration.from({ days: -1, hours: -12, minutes: -16, seconds: -54 })).PREPARE_LOAF( 50,  "FALSE"),
         E\`04:56:54\`.EAT_BANANA,
         C.PACKAGE_BANANA({
           bundle: [
@@ -127,9 +128,27 @@ describe('sequence generation', () => {
               number_of_bananas: 12
             }
           ]
-        })
+        }),
+        C.PACKAGE_BANANA(1034,[['companyA',100_000],['companyB',10_100]]),
       ];
     }
+    `,
+    );
+
+    expansionId4 = await insertExpansion(
+        graphqlClient,
+        'BakeBananaBread',
+        `
+      export default function MyExpansion(props: {
+        activityInstance: ActivityType
+      }): ExpansionReturn {
+        const { activityInstance } = props;
+        return [
+          A("2022-203T00:00:00").LOAD("BACKGROUND-A").ARGUMENTS(props.activityInstance.attributes.arguments.temperature),
+          A("2022-204T00:00:00").ACTIVATE("BACKGROUND-B"),
+          R("00:00:90").ADD_WATER
+          ];
+      }
     `,
     );
   });
@@ -147,13 +166,15 @@ describe('sequence generation', () => {
       expansionId1,
       expansionId2,
       expansionId3,
+      expansionId4
     ]);
 
     // Create Activity Directives
-    const [activityId1, activityId2, activityId3] = await Promise.all([
+    const [activityId1, activityId2, activityId3, activityId4] = await Promise.all([
       insertActivityDirective(graphqlClient, planId, 'GrowBanana'),
       insertActivityDirective(graphqlClient, planId, 'PeelBanana', '30 minutes'),
       insertActivityDirective(graphqlClient, planId, 'ThrowBanana', '60 minutes'),
+      insertActivityDirective(graphqlClient, planId, 'BakeBananaBread', '90 minutes',{tbSugar : 1, glutenFree: false}),
     ]);
 
     // Simulate Plan
@@ -170,10 +191,11 @@ describe('sequence generation', () => {
       linkActivityInstance(graphqlClient, sequencePk, activityId1),
       linkActivityInstance(graphqlClient, sequencePk, activityId2),
       linkActivityInstance(graphqlClient, sequencePk, activityId3),
+      linkActivityInstance(graphqlClient, sequencePk, activityId4),
     ]);
 
     // Get the simulated activity ids
-    const [simulatedActivityId1, simulatedActivityId2, simulatedActivityId3] = await Promise.all([
+    const [simulatedActivityId1, simulatedActivityId2, simulatedActivityId3, simulatedActivityId4] = await Promise.all([
       convertActivityDirectiveIdToSimulatedActivityId(
         graphqlClient,
         simulationArtifactPk.simulationDatasetId,
@@ -188,6 +210,11 @@ describe('sequence generation', () => {
         graphqlClient,
         simulationArtifactPk.simulationDatasetId,
         activityId3,
+      ),
+      convertActivityDirectiveIdToSimulatedActivityId(
+          graphqlClient,
+          simulationArtifactPk.simulationDatasetId,
+          activityId4,
       ),
     ]);
     /** End Setup */
@@ -401,7 +428,86 @@ describe('sequence generation', () => {
           },
         ],
         metadata: { simulatedActivityId: simulatedActivityId3 },
+      },{
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
       },
+      {
+        args: [
+          {
+            name: "arg_0",
+            type: "number",
+            value: 350
+          }
+        ],
+        metadata: {
+          simulatedActivityId: simulatedActivityId4
+        },
+        sequence: "BACKGROUND-A",
+        time: {
+          tag: "2022-203T00:00:00.000",
+          type: "ABSOLUTE"
+        },
+        type: "load"
+      },
+      {
+        metadata: {
+          simulatedActivityId: simulatedActivityId4
+        },
+        sequence: "BACKGROUND-B",
+        time: {
+          tag: "2022-204T00:00:00.000",
+          type: "ABSOLUTE"
+        },
+        type: "activate"
+      },
+      {
+        args: [],
+        metadata: {
+          simulatedActivityId: simulatedActivityId4
+        },
+        stem: "ADD_WATER",
+        time: {
+          tag: "00:01:30.000",
+          type: "COMMAND_RELATIVE"
+        },
+        type: "command"
+      }
     ]);
 
     /** Begin Cleanup */
@@ -412,6 +518,7 @@ describe('sequence generation', () => {
       removeActivityDirective(graphqlClient, activityId1, planId),
       removeActivityDirective(graphqlClient, activityId2, planId),
       removeActivityDirective(graphqlClient, activityId3, planId),
+      removeActivityDirective(graphqlClient, activityId4, planId),
     ]);
     await removeExpansionSet(graphqlClient, expansionSetId);
     /** End Cleanup */
@@ -721,6 +828,45 @@ describe('sequence generation', () => {
         ],
         metadata: { simulatedActivityId: simulatedActivityId3 },
       },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
+      },
     ]);
 
     const secondSequence = getSequenceSeqJsonBulkResponse[1]!;
@@ -921,6 +1067,45 @@ describe('sequence generation', () => {
                   name: 'number_of_bananas',
                   type: 'number',
                   value: 12,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId6 },
+      },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
                 },
               ],
             ],
@@ -1221,6 +1406,45 @@ describe('sequence generation', () => {
                   name: 'number_of_bananas',
                   type: 'number',
                   value: 12,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
+      },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
                 },
               ],
             ],
@@ -1580,6 +1804,45 @@ describe('sequence generation', () => {
       },
       {
         type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
+      },
+      {
+        type: 'command',
         stem: '$$ERROR$$',
         time: { type: TimingTypes.COMMAND_COMPLETE },
         args: [{ name: 'message', type: 'string', value: 'Error: Unimplemented' }],
@@ -1781,6 +2044,45 @@ describe('sequence generation', () => {
                   name: 'number_of_bananas',
                   type: 'number',
                   value: 12,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId7 },
+      },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
                 },
               ],
             ],
@@ -2084,6 +2386,45 @@ describe('sequence generation', () => {
                   name: 'number_of_bananas',
                   type: 'number',
                   value: 12,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
+      },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
                 },
               ],
             ],
@@ -2421,6 +2762,45 @@ describe('sequence generation', () => {
         ],
         metadata: { simulatedActivityId: simulatedActivityId3 },
       },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId3 },
+      },
     ]);
 
     const secondSequence = getSequenceSeqJsonResponse[1]!;
@@ -2621,6 +3001,45 @@ describe('sequence generation', () => {
                   name: 'number_of_bananas',
                   type: 'number',
                   value: 12,
+                },
+              ],
+            ],
+          },
+        ],
+        metadata: { simulatedActivityId: simulatedActivityId7 },
+      },
+      {
+        type: 'command',
+        stem: 'PACKAGE_BANANA',
+        time: { type: TimingTypes.COMMAND_COMPLETE },
+        args: [
+          { name: 'lot_number', type: 'number', value: 1034 },
+          {
+            name: 'bundle',
+            type: 'repeat',
+            value: [
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyA',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 100000,
+                },
+              ],
+              [
+                {
+                  name: 'bundle_name',
+                  type: 'string',
+                  value: 'companyB',
+                },
+                {
+                  name: 'number_of_bananas',
+                  type: 'number',
+                  value: 10100,
                 },
               ],
             ],

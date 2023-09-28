@@ -51,6 +51,7 @@ public final class SchedulerWorkerAppDriver {
     hikariConfig.addDataSourceProperty("applicationName", "Scheduler Worker");
     hikariConfig.setUsername(postgresStore.user());
     hikariConfig.setPassword(postgresStore.password());
+    hikariConfig.setMaximumPoolSize(2);
 
     hikariConfig.setConnectionInitSql("set time zone 'UTC'");
 
@@ -62,7 +63,6 @@ public final class SchedulerWorkerAppDriver {
 
     final var specificationService = new LocalSpecificationService(stores.specifications());
     final var scheduleAgent = new SynchronousSchedulerAgent(specificationService,
-        merlinService,
         merlinService,
         config.merlinFileStore(),
         config.missionRuleJarPath(),

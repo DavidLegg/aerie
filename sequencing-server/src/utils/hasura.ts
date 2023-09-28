@@ -23,6 +23,7 @@ const HASURA_PLAN_PERMISSIONS = [
  * Endpoints that don't need any permission checking.
  */
 export const ENDPOINTS_WHITELIST = new Set([
+  '/',
   '/health',
   '/get-command-typescript',
   '/get-activity-typescript',
@@ -30,6 +31,8 @@ export const ENDPOINTS_WHITELIST = new Set([
   '/seqjson/bulk-get-seqjson-for-sequence-standalone',
   '/seqjson/get-seqjson-for-sequence-standalone',
   '/seqjson/get-seqjson-for-seqid-and-simulation-dataset',
+  '/seqjson/bulk-get-edsl-for-seqjson',
+  '/seqjson/get-edsl-for-seqjson'
 ]);
 
 /**

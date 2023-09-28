@@ -11,11 +11,16 @@ export enum TimingTypes {
   COMMAND_COMPLETE = 'COMMAND_COMPLETE',
 }
 
+type VARIABLE_INT = 'INT' & { __brand: 'VARIABLE_INT' };
+type VARIABLE_UINT = 'UINT' & { __brand: 'VARIABLE_UINT' };
+type VARIABLE_FLOAT = 'FLOAT' & { __brand: 'VARIABLE_FLOAT' };
+type VARIABLE_STRING = 'STRING' & { __brand: 'VARIABLE_STRING' };
+type VARIABLE_ENUM = 'ENUM' & { __brand: 'VARIABLE_UNIT' };
 export enum VariableType {
-  FLOAT = 'FLOAT',
   INT = 'INT',
-  STRING = 'STRING',
   UINT = 'UINT',
+  FLOAT = 'FLOAT',
+  STRING = 'STRING',
   ENUM = 'ENUM'
 }
 
@@ -34,7 +39,7 @@ enum StepType {
 // @ts-ignore : 'VariableDeclaration' found in JSON Spec
 export interface INT<N extends string> extends VariableDeclaration {
   name: N;
-  type: VariableType.INT;
+  type: VARIABLE_INT;
   // @ts-ignore : 'VariableRange' found in JSON Spec
   allowable_ranges?: VariableRange[] | undefined;
   allowable_values?: unknown[] | undefined;
@@ -44,7 +49,7 @@ export interface INT<N extends string> extends VariableDeclaration {
 // @ts-ignore : 'VariableDeclaration' found in JSON Spec
 export interface UINT<N extends string> extends VariableDeclaration {
   name: N;
-  type: VariableType.UINT;
+  type: VARIABLE_UINT;
   // @ts-ignore : 'VariableRange' found in JSON Spec
   allowable_ranges?: VariableRange[] | undefined;
   allowable_values?: unknown[] | undefined;
@@ -54,7 +59,7 @@ export interface UINT<N extends string> extends VariableDeclaration {
 // @ts-ignore : 'VariableDeclaration' found in JSON Spec
 export interface FLOAT<N extends string> extends VariableDeclaration {
   name: N;
-  type: VariableType.FLOAT;
+  type: VARIABLE_FLOAT;
   // @ts-ignore : 'VariableRange' found in JSON Spec
   allowable_ranges?: VariableRange[] | undefined;
   allowable_values?: unknown[] | undefined;
@@ -64,7 +69,7 @@ export interface FLOAT<N extends string> extends VariableDeclaration {
 // @ts-ignore : 'VariableDeclaration' found in JSON Spec
 export interface STRING<N extends string> extends VariableDeclaration {
   name: N;
-  type: VariableType.STRING;
+  type: VARIABLE_STRING;
   allowable_values?: unknown[] | undefined;
   sc_name?: string | undefined;
 }
@@ -73,7 +78,7 @@ export interface STRING<N extends string> extends VariableDeclaration {
 export interface ENUM<N extends string, E extends string> extends VariableDeclaration {
   name: N;
   enum_name: E;
-  type: VariableType.ENUM;
+  type: VARIABLE_ENUM;
   // @ts-ignore : 'VariableRange' found in JSON Spec
   allowable_ranges?: VariableRange[] | undefined;
   allowable_values?: unknown[] | undefined;
@@ -87,7 +92,7 @@ export interface ENUM<N extends string, E extends string> extends VariableDeclar
 
 export type VariableOptions = {
   name: string;
-  type: VariableType;
+  type: VariableType | VARIABLE_ENUM | VARIABLE_INT | VARIABLE_UINT | VARIABLE_FLOAT | VARIABLE_STRING;
   enum_name?: string | undefined;
   allowable_values?: unknown[] | undefined;
   // @ts-ignore : 'VariableRange' found in JSON Spec
@@ -241,8 +246,6 @@ export type RequestOptions =
   metadata?: Metadata;
 };
 
-export type Arrayable<T> = T | Arrayable<T>[];
-
 /**-----------------------------
  *      GLOBAL eDSL Declarations
  * -----------------------------
@@ -380,7 +383,8 @@ declare global {
   }
 
   type Context = {};
-  type ExpansionReturn = Arrayable<CommandStem>;
+  // @ts-ignore : 'Description' found in JSON Spec
+  type ExpansionReturn = (Command | Load | Activate)[];
 
   type U<BitLength extends 8 | 16 | 32 | 64> = number;
   type U8 = U<8>;
@@ -970,7 +974,7 @@ export class Variable implements VariableDeclaration {
 
   constructor(opts: VariableOptions) {
     this.name = opts.name;
-    this.type = opts.type;
+    this.type = opts.type as VariableType;
 
     this._enum_name = opts.enum_name ?? undefined;
     this._allowable_ranges = opts.allowable_ranges ?? undefined;
@@ -1117,7 +1121,7 @@ export function INT<N extends string>(
     },
 ): INT<N> {
   const { allowable_ranges, allowable_values, sc_name } = optionals || {};
-  return { name, type: VariableType.INT, allowable_ranges, allowable_values, sc_name };
+  return { name, type: VariableType.INT as unknown as VARIABLE_INT, allowable_ranges, allowable_values, sc_name };
 }
 
 export function UINT<N extends string>(name: N): UINT<N>;
@@ -1140,7 +1144,7 @@ export function UINT<N extends string>(
     },
 ): UINT<N> {
   const { allowable_ranges, allowable_values, sc_name } = optionals || {};
-  return { name, type: VariableType.UINT, allowable_ranges, allowable_values, sc_name };
+  return { name, type: VariableType.UINT as unknown as VARIABLE_UINT, allowable_ranges, allowable_values, sc_name };
 }
 
 export function FLOAT<N extends string>(name: N): FLOAT<N>;
@@ -1163,7 +1167,7 @@ export function FLOAT<N extends string>(
     },
 ): FLOAT<N> {
   const { allowable_ranges, allowable_values, sc_name } = optionals || {};
-  return { name, type: VariableType.FLOAT, allowable_ranges, allowable_values, sc_name };
+  return { name, type: VariableType.FLOAT as unknown as VARIABLE_FLOAT, allowable_ranges, allowable_values, sc_name };
 }
 
 export function STRING<N extends string>(name: N): STRING<N>;
@@ -1182,7 +1186,7 @@ export function STRING<N extends string>(
     },
 ): STRING<N> {
   const { allowable_values, sc_name } = optionals || {};
-  return { name, type: VariableType.STRING, allowable_values, sc_name };
+  return { name, type: VariableType.STRING as unknown as VARIABLE_STRING, allowable_values, sc_name };
 }
 
 export function ENUM<const N extends string, const E extends string>(name: N, enum_name: E): ENUM<N, E>;
@@ -1207,7 +1211,7 @@ export function ENUM<const N extends string, const E extends string>(
     },
 ): ENUM<N, E> {
   const { allowable_ranges, allowable_values, sc_name } = optionals || {};
-  return { name, enum_name, type: VariableType.ENUM, allowable_ranges, allowable_values, sc_name };
+  return { name, enum_name, type: VariableType.ENUM as unknown as VARIABLE_ENUM, allowable_ranges, allowable_values, sc_name };
 }
 
 /**
@@ -1219,9 +1223,10 @@ export function ENUM<const N extends string, const E extends string>(
 // @ts-ignore : 'Args' found in JSON Spec
 export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}> implements Command {
   public readonly arguments: A;
-  public readonly absoluteTime: Temporal.Instant | null = null;
-  public readonly epochTime: Temporal.Duration | null = null;
-  public readonly relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
+
 
   public readonly stem: string;
   // @ts-ignore : 'Args' found in JSON Spec
@@ -1241,11 +1246,11 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
     this.arguments = opts.arguments;
 
     if ('absoluteTime' in opts) {
-      this.absoluteTime = opts.absoluteTime;
+      this._absoluteTime = opts.absoluteTime;
     } else if ('epochTime' in opts) {
-      this.epochTime = opts.epochTime;
+      this._epochTime = opts.epochTime;
     } else if ('relativeTime' in opts) {
-      this.relativeTime = opts.relativeTime;
+      this._relativeTime = opts.relativeTime;
     }
     this._metadata = opts.metadata;
     this._description = opts.description;
@@ -1281,9 +1286,9 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
       models: models,
       metadata: this._metadata,
       description: this._description,
-      ...(this.absoluteTime && { absoluteTime: this.absoluteTime }),
-      ...(this.epochTime && { epochTime: this.epochTime }),
-      ...(this.relativeTime && { relativeTime: this.relativeTime }),
+      ...(this._absoluteTime && { absoluteTime: this._absoluteTime }),
+      ...(this._epochTime && { epochTime: this._epochTime }),
+      ...(this._relativeTime && { relativeTime: this._relativeTime }),
     });
   }
 
@@ -1300,9 +1305,9 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
       models: this._models,
       metadata: metadata,
       description: this._description,
-      ...(this.absoluteTime && { absoluteTime: this.absoluteTime }),
-      ...(this.epochTime && { epochTime: this.epochTime }),
-      ...(this.relativeTime && { relativeTime: this.relativeTime }),
+      ...(this._absoluteTime && { absoluteTime: this._absoluteTime }),
+      ...(this._epochTime && { epochTime: this._epochTime }),
+      ...(this._relativeTime && { relativeTime: this._relativeTime }),
     });
   }
 
@@ -1319,14 +1324,26 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
       models: this._models,
       metadata: this._metadata,
       description: description,
-      ...(this.absoluteTime && { absoluteTime: this.absoluteTime }),
-      ...(this.epochTime && { epochTime: this.epochTime }),
-      ...(this.relativeTime && { relativeTime: this.relativeTime }),
+      ...(this._absoluteTime && { absoluteTime: this._absoluteTime }),
+      ...(this._epochTime && { epochTime: this._epochTime }),
+      ...(this._relativeTime && { relativeTime: this._relativeTime }),
     });
   }
   // @ts-ignore : 'Description' found in JSON Spec
   public GET_DESCRIPTION(): Description | undefined {
     return this._description;
+  }
+
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
   }
 
   // @ts-ignore : 'Command' found in JSON Spec
@@ -1336,12 +1353,12 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
       stem: this.stem,
       // prettier-ignore
       time:
-          this.absoluteTime !== null
-              ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this.absoluteTime) }
-          : this.epochTime !== null
-              ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this.epochTime) }
-          : this.relativeTime !== null
-              ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this.relativeTime) }
+          this._absoluteTime
+              ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
+          : this._epochTime
+              ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
+          : this._relativeTime
+              ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
           : { type: TimingTypes.COMMAND_COMPLETE },
       type: this.type,
       ...(this._metadata ? { metadata: this._metadata } : {}),
@@ -1404,15 +1421,18 @@ export class CommandStem<A extends Args[] | { [argName: string]: any } = [] | {}
   }
 
   public toEDSLString(): string {
-    const timeString = this.absoluteTime
-        ? `A\`${instantToDoy(this.absoluteTime)}\``
-        : this.epochTime
-            ? `E\`${durationToHms(this.epochTime)}\``
-            : this.relativeTime
-                ? `R\`${durationToHms(this.relativeTime)}\``
+    const timeString = this._absoluteTime
+        ? `A\`${instantToDoy(this._absoluteTime)}\``
+        : this._epochTime
+            ? `E\`${durationToHms(this._epochTime)}\``
+            : this._relativeTime
+                ? `R\`${durationToHms(this._relativeTime)}\``
                 : 'C';
 
-    const argsString = Object.keys(this.arguments).length === 0 ? '' : `(${argumentsToString(this.arguments)})`;
+    const argsString =
+        Object.keys(this.arguments).length === 0
+            ? ''
+            : `(${argumentsToPositionString(this.arguments)})`;
 
     const metadata =
         this._metadata && Object.keys(this._metadata).length !== 0
@@ -1502,7 +1522,11 @@ export class ImmediateStem<A extends Args[] | { [argName: string]: any } = [] | 
   }
 
   public toEDSLString(): string {
-    const argsString = Object.keys(this.arguments).length === 0 ? '' : `(${argumentsToString(this.arguments)})`;
+    const argsString =
+        Object.keys(this.arguments).length === 0
+            ? ''
+            : `(${argumentsToPositionString(this.arguments)})`;
+
 
     const metadata =
         this._metadata && Object.keys(this._metadata).length !== 0
@@ -1524,9 +1548,9 @@ export class Ground_Block implements GroundBlock {
   time!: Time;
   type: 'ground_block' = StepType.GroundBlock;
 
-  private readonly _absoluteTime: Temporal.Instant | null = null;
-  private readonly _epochTime: Temporal.Duration | null = null;
-  private readonly _relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
 
   // @ts-ignore : 'Args' found in JSON Spec
   private readonly _args: Args | undefined;
@@ -1648,11 +1672,11 @@ export class Ground_Block implements GroundBlock {
   }
 
   // @ts-ignore : 'Description' found in JSON Spec
-  public ARGUMENTS(args: Args): Ground_Block {
+  public ARGUMENTS(...args: [Args] | [A, ...A[]]): Ground_Block {
     return Ground_Block.new({
       name: this.name,
       ...(this._models && { models: this._models }),
-      args: args,
+      args: typeof args[0] === 'object' ? args[0] : convertArgsToInterfaces(commandArraysToObj(args, [])),
       ...(this._description && { description: this._description }),
       ...(this._metadata && { metadata: this._metadata }),
       ...(this._absoluteTime && { absoluteTime: this._absoluteTime }),
@@ -1666,17 +1690,29 @@ export class Ground_Block implements GroundBlock {
     return this._args;
   }
 
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
+  }
+
   // @ts-ignore : 'GroundBlock' found in JSON Spec
   public toSeqJson(): GroundBlock {
     return {
       name: this.name,
       // prettier-ignore
       time:
-          this._absoluteTime !== null
+          this._absoluteTime
               ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
-          : this._epochTime !== null
+          : this._epochTime
               ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
-          : this._relativeTime !== null
+          : this._relativeTime
               ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
           : { type: TimingTypes.COMMAND_COMPLETE },
       ...(this._args ? { args: this._args } : {}),
@@ -1720,7 +1756,7 @@ export class Ground_Block implements GroundBlock {
 
     const args =
         this._args && Object.keys(this._args).length !== 0
-            ? '\n' + indent(`.ARGUMENTS(${argumentsToString(this._args)})`, 1)
+            ? '\n' + indent(`.ARGUMENTS(${argumentsToPositionString(convertInterfacesToArgs(this._args))})`, 1)
             : '';
 
     const metadata =
@@ -1757,9 +1793,9 @@ export class Ground_Event implements GroundEvent {
   time!: Time;
   type: 'ground_event' = StepType.GroundEvent;
 
-  private readonly _absoluteTime: Temporal.Instant | null = null;
-  private readonly _epochTime: Temporal.Duration | null = null;
-  private readonly _relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
 
   // @ts-ignore : 'Args' found in JSON Spec
   private readonly _args: Args | undefined;
@@ -1881,11 +1917,11 @@ export class Ground_Event implements GroundEvent {
   }
 
   // @ts-ignore : 'Description' found in JSON Spec
-  public ARGUMENTS(args: Args): Ground_Event {
+  public ARGUMENTS(...args: [Args] | [A, ...A[]]): Ground_Event {
     return Ground_Event.new({
       name: this.name,
       ...(this._models && { models: this._models }),
-      args: args,
+      args: typeof args[0] === 'object' ? args[0] : convertArgsToInterfaces(commandArraysToObj(args, [])),
       ...(this._description && { description: this._description }),
       ...(this._metadata && { metadata: this._metadata }),
       ...(this._absoluteTime && { absoluteTime: this._absoluteTime }),
@@ -1899,16 +1935,28 @@ export class Ground_Event implements GroundEvent {
     return this._args;
   }
 
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
+  }
+
   // @ts-ignore : 'Ground_Event' found in JSON Spec
   public toSeqJson(): GroundEvent {
     return {
       name: this.name,
       time:
-          this._absoluteTime !== null
+          this._absoluteTime
               ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
-              : this._epochTime !== null
+              : this._epochTime
                   ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
-                  : this._relativeTime !== null
+                  : this._relativeTime
                       ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
                       : { type: TimingTypes.COMMAND_COMPLETE },
       ...(this._args ? { args: this._args } : {}),
@@ -1952,7 +2000,7 @@ export class Ground_Event implements GroundEvent {
 
     const args =
         this._args && Object.keys(this._args).length !== 0
-            ? `\n` + indent(`.ARGUMENTS(${argumentsToString(this._args)})`, 1)
+            ? `\n` + indent(`.ARGUMENTS(${argumentsToPositionString(convertInterfacesToArgs(this._args))})`, 1)
             : '';
 
     const metadata =
@@ -1989,9 +2037,9 @@ export class ActivateStep implements Activate {
   time!: Time;
   type: 'activate' = StepType.Activate;
 
-  private readonly _absoluteTime: Temporal.Instant | null = null;
-  private readonly _epochTime: Temporal.Duration | null = null;
-  private readonly _relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
 
   // @ts-ignore : 'Args' found in JSON Spec
   private readonly _args?: Args | undefined;
@@ -2066,10 +2114,10 @@ export class ActivateStep implements Activate {
   }
 
   // @ts-ignore : 'Args' found in JSON Spec
-  public ARGUMENTS(args: Args): ActivateStep {
+  public ARGUMENTS(...args: [Args] | [A, ...A[]]): ActivateStep {
     return ActivateStep.new({
       sequence: this.sequence,
-      args: args,
+      args: typeof args[0] === 'object' ? args[0] : convertArgsToInterfaces(commandArraysToObj(args, [])),
       ...(this._description && { description: this._description }),
       ...(this._engine && { engine: this._engine }),
       ...(this._epoch && { epoch: this._epoch }),
@@ -2185,16 +2233,28 @@ export class ActivateStep implements Activate {
     return this._models;
   }
 
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
+  }
+
   // @ts-ignore : 'Activate' found in JSON Spec
   public toSeqJson(): Activate {
     return {
       sequence: this.sequence,
       time:
-          this._absoluteTime !== null
+          this._absoluteTime
               ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
-              : this._epochTime !== null
+              : this._epochTime
                   ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
-                  : this._relativeTime !== null
+                  : this._relativeTime
                       ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
                       : { type: TimingTypes.COMMAND_COMPLETE },
       type: this.type,
@@ -2242,7 +2302,7 @@ export class ActivateStep implements Activate {
 
     const args =
         this._args && Object.keys(this._args).length !== 0
-            ? '\n' + indent(`.ARGUMENTS(${argumentsToString(this._args)})`, 1)
+            ? '\n' + indent(`.ARGUMENTS(${argumentsToPositionString(convertInterfacesToArgs(this._args))})`, 1)
             : '';
 
     const description =
@@ -2283,9 +2343,9 @@ export class LoadStep implements Load {
   time!: Time;
   type: 'load' = StepType.Load;
 
-  private readonly _absoluteTime: Temporal.Instant | null = null;
-  private readonly _epochTime: Temporal.Duration | null = null;
-  private readonly _relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
 
   // @ts-ignore : 'Args' found in JSON Spec
   private readonly _args?: Args | undefined;
@@ -2360,10 +2420,10 @@ export class LoadStep implements Load {
   }
 
   // @ts-ignore : 'Args' found in JSON Spec
-  public ARGUMENTS(args: Args): LoadStep {
+  public ARGUMENTS(...args: [Args] | [A, ...A[]]): LoadStep {
     return LoadStep.new({
       sequence: this.sequence,
-      args: args,
+      args: typeof args[0] === 'object' ? args[0] : convertArgsToInterfaces(commandArraysToObj(args, [])),
       ...(this._description && { description: this._description }),
       ...(this._engine && { engine: this._engine }),
       ...(this._epoch && { epoch: this._epoch }),
@@ -2479,16 +2539,28 @@ export class LoadStep implements Load {
     return this._models;
   }
 
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
+  }
+
   // @ts-ignore : 'Load' found in JSON Spec
   public toSeqJson(): Load {
     return {
       sequence: this.sequence,
       time:
-          this._absoluteTime !== null
+          this._absoluteTime
               ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
-              : this._epochTime !== null
+              : this._epochTime
                   ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
-                  : this._relativeTime !== null
+                  : this._relativeTime
                       ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
                       : { type: TimingTypes.COMMAND_COMPLETE },
       type: this.type,
@@ -2536,7 +2608,7 @@ export class LoadStep implements Load {
 
     const args =
         this._args && Object.keys(this._args).length !== 0
-            ? '\n' + indent(`.ARGUMENTS(${argumentsToString(this._args)})`, 1)
+            ? '\n' + indent(`.ARGUMENTS(${argumentsToPositionString(convertInterfacesToArgs(this._args))})`, 1)
             : '';
 
     const description =
@@ -2773,9 +2845,9 @@ class RequestCommon {
   }
 }
 class RequestTime extends RequestCommon implements RequestWithTime {
-  private readonly _absoluteTime: Temporal.Instant | null = null;
-  private readonly _epochTime: Temporal.Duration | null = null;
-  private readonly _relativeTime: Temporal.Duration | null = null;
+  private readonly _absoluteTime: Temporal.Instant | undefined = undefined;
+  private readonly _epochTime: Temporal.Duration | undefined = undefined;
+  private readonly _relativeTime: Temporal.Duration | undefined = undefined;
 
   private constructor(opts: RequestOptions) {
     super(opts);
@@ -2849,8 +2921,20 @@ class RequestTime extends RequestCommon implements RequestWithTime {
       ...(this._relativeTime ? { relativeTime: this._relativeTime } : {}),
     });
   }
-  // @ts-ignore : 'Request' found in JSON Spec
 
+  public GET_ABSOLUTE_TIME(): Temporal.Instant | undefined {
+    return this._absoluteTime;
+  }
+
+  public GET_EPOCH_TIME(): Temporal.Duration | undefined {
+    return this._epochTime;
+  }
+
+  public GET_RELATIVE_TIME(): Temporal.Duration | undefined {
+    return this._relativeTime;
+  }
+
+  // @ts-ignore : 'Request' found in JSON Spec
   public static override fromSeqJson(json: Request): RequestTime {
     // prettier-ignore
     const timeValue = json.time
@@ -2913,11 +2997,11 @@ class RequestTime extends RequestCommon implements RequestWithTime {
       ...{
         // prettier-ignore
         time:
-            this._absoluteTime !== null
+            this._absoluteTime
                 ? { type: TimingTypes.ABSOLUTE, tag: instantToDoy(this._absoluteTime) }
-            : this._epochTime !== null
+            : this._epochTime
                 ? { type: TimingTypes.EPOCH_RELATIVE, tag: durationToHms(this._epochTime) }
-            : this._relativeTime !== null
+            : this._relativeTime
                 ? { type: TimingTypes.COMMAND_RELATIVE, tag: durationToHms(this._relativeTime) }
             : { type: TimingTypes.COMMAND_COMPLETE },
       },
@@ -3091,8 +3175,8 @@ export function doyToInstant(doy: DOY_STRING): Temporal.Instant {
   ];
 
   //use to convert doy to month and day
-  const doyDate = new Date(parseInt(year, 10), 0, parseInt(doyStr, 10));
-  // convert to UTC Date
+  const doyDate = new Date(Date.UTC(parseInt(year, 10), 0, parseInt(doyStr, 10), parseInt(hour, 10),parseInt(minute,10),parseInt(second,10),parseInt(millisecond ? millisecond : '0',10)));
+  // Convert to UTC Date
   const utcDoyDate = new Date(
     Date.UTC(
       doyDate.getUTCFullYear(),
@@ -3106,13 +3190,13 @@ export function doyToInstant(doy: DOY_STRING): Temporal.Instant {
   );
 
   return Temporal.ZonedDateTime.from({
-    year: parseInt(year, 10),
+    year: utcDoyDate.getUTCFullYear(),
     month: utcDoyDate.getUTCMonth() + 1,
     day: utcDoyDate.getUTCDate(),
-    hour: parseInt(hour, 10),
-    minute: parseInt(minute, 10),
-    second: parseInt(second, 10),
-    millisecond: parseInt(millisecond ?? '0', 10),
+    hour: utcDoyDate.getUTCHours(),
+    minute: utcDoyDate.getUTCMinutes(),
+    second: utcDoyDate.getUTCSeconds(),
+    millisecond: utcDoyDate.getUTCMilliseconds(),
     timeZone: 'UTC',
   }).toInstant();
 }
@@ -3132,26 +3216,57 @@ export function durationToHms(time: Temporal.Duration): HMS_STRING {
 
 export function hmsToDuration(hms: HMS_STRING, epoch: boolean = false): Temporal.Duration {
   const match = hms.match(HMS_REGEX);
-  if (match === null) {
+  if (!match) {
     throw new Error(`Invalid HMS string: ${hms}`);
   }
 
-  const [, sign, days = '0', hours = "0", minutes = "0", seconds = "0", milliseconds = '0'] = match;
-  const isPositive = sign !== '-';
-  const parseNumber = (value: string) => (isPositive ? 1 : -1) * parseInt(value, 10);
+  const [, sign, days = '0', hours = '0', minutes = '0', seconds = '0', milliseconds = '0'] = match;
+  const isNegative = sign === '-';
+
+  let daysNum = parseInt(days.replace('T', ''),10)
+  let hoursNum = parseInt(hours,10)
+  let minuteNum = parseInt(minutes,10)
+  let secondsNum = parseInt(seconds,10)
+  let millisecondNum = parseInt(milliseconds,10)
+
+  // Normalize milliseconds, seconds, minutes, and hours iteratively
+  if (isNegative) {
+    daysNum = Math.abs(daysNum);
+    hoursNum = Math.abs(hoursNum);
+    minuteNum = Math.abs(minuteNum);
+    secondsNum = Math.abs(secondsNum);
+    millisecondNum = Math.abs(millisecondNum);
+  }
+  // Normalize milliseconds and seconds
+  secondsNum += Math.floor(secondsNum / 1000);
+  millisecondNum = millisecondNum % 1000;
+
+  // Normalize seconds and minutes
+  minuteNum += Math.floor(secondsNum / 60);
+  secondsNum = secondsNum % 60;
+
+  // Normalize minutes and hours
+  hoursNum += Math.floor(minuteNum / 60);
+  minuteNum = minuteNum % 60;
+
+  // Normalize hours and days
+  daysNum += Math.floor(hoursNum / 24);
+  hoursNum = hoursNum % 24;
+
+  if (daysNum > 365){
+    throw new Error(`Days cannot exceed 365: ${hms}`);
+  }
 
   if (!epoch) {
-    if(!isPositive)
-      throw new Error(`Signed time (+/-) is not allowed for Relative Times: ${hms}`);
-    if(days !== '0')
-      throw new Error(`Day (DDD) is not allowed for Relative Times: ${hms}`);
+    if (isNegative) {throw new Error(`Signed time (+/-) is not allowed for Relative Times: ${hms}`);}
+    if (daysNum !== 0) {throw new Error(`Day (DDD) is not allowed for Relative Times: ${hms}`);}
   }
   return Temporal.Duration.from({
-    days: parseNumber(days.replace('T', '')),
-    hours: parseNumber(hours),
-    minutes: parseNumber(minutes),
-    seconds: parseNumber(seconds),
-    milliseconds: parseNumber(milliseconds),
+    days: isNegative ? -daysNum : daysNum,
+    hours: isNegative ? -hoursNum : hoursNum,
+    minutes: isNegative ? -minuteNum : minuteNum,
+    seconds: isNegative ? -secondsNum : secondsNum,
+    milliseconds: isNegative ? -millisecondNum : millisecondNum ,
   });
 }
 
@@ -3293,6 +3408,46 @@ function commandsWithTimeValue<T extends TimingTypes>(
  * ---------------------------------
  */
 
+
+/**
+ * Converts an array of arguments and keys into an object.
+ *
+ * @param {any[]} args - The array of arguments.
+ * @param {string[]} keys - The array of keys.
+ * @returns {Record<string, any>} The object.
+ */
+// @ts-ignore : Used in generated code
+function commandArraysToObj(args: any[], keys: string[]): Record<string, any> {
+  const obj: Record<string, any> = {};
+
+  function handleNestedArrays(values: any[], subKeys: string[]): any[] {
+    const nestedObjs = [];
+    for (const subArray of values) {
+      nestedObjs.push(commandArraysToObj(subArray, subKeys));
+    }
+    return nestedObjs;
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    const key = keys[i] || `arg_${i}`; // Use `arg_${i}` if key is undefined
+    const value = args[i];
+
+    if (Array.isArray(value)) {
+      const subKeys = keys.slice(i + 1);
+      obj[key] = handleNestedArrays(value, subKeys);
+      if (value.length > 0) {
+        keys = keys.slice(0, i + 1).concat(subKeys.slice(value[0].length));
+      }
+    } else {
+      // Assign values to properties
+      obj[key] = value;
+    }
+  }
+
+  return obj;
+}
+
+
 // @ts-ignore : Used in generated code
 function sortCommandArguments(args: { [argName: string]: any }, order: string[]): { [argName: string]: any } {
   if (typeof args[0] === 'object') {
@@ -3422,7 +3577,7 @@ function convertInterfacesToArgs(interfaces: Args, localNames?: String[], parame
             } else if (parameterNames && parameterNames.includes(arg.value)) {
               variable.setKind('parameters');
             } else {
-              const errorMsg = `Variable '${arg.value}' is not defined as a local or parameter`;
+              const errorMsg = `Variable '${arg.value}' is not defined as a local or parameter\n`;
               variable = Variable.new({ name: `${arg.value} //ERROR: ${errorMsg}`, type: VariableType.INT });
               variable.setKind('unknown');
             }
@@ -3590,6 +3745,73 @@ function argumentsToString<A extends Args[] | { [argName: string]: any } = [] | 
     output += ']';
   } else {
     output += '}';
+  }
+
+  return output;
+}
+
+/**
+ * Converts an object of arguments to an array string representation,
+ * preserving the position-based structure of the arguments.
+ *
+ * @template A - Type parameter representing the type of the arguments.
+ * @param {A} args - The arguments to convert.
+ * @returns {string} - The string representation of the arguments.
+ */
+function argumentsToPositionString<A extends any[] | { [argName: string]: any } = [] | {}>(args: A): string {
+  let output = '';
+
+  function printObject(obj: { [argName: string]: any }) {
+    Object.keys(obj).forEach((key, index) => {
+      const value = obj[key];
+
+      if (Array.isArray(value)) {
+        if (index > 0) output += ',';
+        output += `[`;
+        printArray(value);
+        output += `]`;
+      } else if (typeof value === 'object') {
+        if (value instanceof Variable) {
+          if (index > 0) output += ',';
+          output += `${value.toReferenceString()}`;
+        } else {
+          if (index > 0) output += ',';
+          output += `[`;
+          printValue(value);
+          output += `]`;
+        }
+      } else {
+        if (index > 0) output += ',';
+        output += `${typeof value === 'string' ? `'${value}'` : value}`;
+      }
+    });
+  }
+
+  function printArray(array: any[]) {
+    array.forEach((item, index) => {
+      if (index > 0) output += ',';
+      output += `[`;
+      printValue(item);
+      output += `]`;
+    });
+  }
+
+  function printValue(value: any) {
+    if (Array.isArray(value)) {
+      printArray(value);
+    } else if (typeof value === 'object') {
+      printObject(value);
+    } else {
+      output += `${typeof value === 'string' ? `'${value}'` : value}`;
+    }
+  }
+
+  if (Array.isArray(args)) {
+    printArray(args);
+  } else if (typeof args === 'object') {
+    printObject(args);
+  } else {
+    output += `${typeof args === 'string' ? `'${args}'` : args}`;
   }
 
   return output;

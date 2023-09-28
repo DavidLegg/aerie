@@ -235,6 +235,30 @@ public final class Interval implements Comparable<Interval>{
     return compareEndToStart(this,x) < 0;
   }
 
+  public int compareStarts(Interval other) {
+    final var timeComparison = this.start.compareTo(other.start);
+    if (timeComparison != 0) return timeComparison;
+    else if (this.startInclusivity == other.startInclusivity) return 0;
+    else if (this.startInclusivity == Inclusive) return -1;
+    else return 1;
+  }
+
+  public int compareEnds(Interval other) {
+    final var timeComparison = this.end.compareTo(other.end);
+    if (timeComparison != 0) return timeComparison;
+    else if (this.startInclusivity == other.startInclusivity) return 0;
+    else if (this.startInclusivity == Inclusive) return 1;
+    else return -1;
+  }
+
+  public int compareEndToStart(Interval other) {
+    final var timeComparison = this.end.compareTo(other.start);
+    if (timeComparison != 0) return timeComparison;
+    else if (this.endInclusivity != other.startInclusivity) return 0;
+    else if (this.endInclusivity == Inclusive) return 1;
+    else return -1;
+  }
+
   public boolean contains(Duration d){
     return !intersect(this, at(d)).isEmpty();
   }
@@ -286,6 +310,14 @@ public final class Interval implements Comparable<Interval>{
     }
 
     return 0;
+  }
+
+  public static boolean hasSameStart(Interval x, Interval y){
+    return compareStartToStart(x,y) == 0;
+  }
+
+  public static boolean hasSameEnd(Interval x, Interval y){
+    return compareEndToEnd(x,y) == 0;
   }
 
   public static int compareStartToEnd(final Interval x, final Interval y) {

@@ -71,6 +71,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getActivityEffectiveArguments
     definition:
       kind: ""
@@ -79,6 +80,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getActivityEffectiveArgumentsBulk
     definition:
       kind: ""
@@ -87,6 +89,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getActivityTypeScript
     definition:
       kind: ""
@@ -111,6 +114,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getSequenceSeqJsonBulk
     definition:
       kind: ""
@@ -119,6 +123,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getUserSequenceSeqJson
     definition:
       kind: ""
@@ -127,6 +132,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: getUserSequenceSeqJsonBulk
     definition:
       kind: ""
@@ -135,6 +141,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: resourceTypes
     definition:
       kind: ""
@@ -143,6 +150,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: schedule
     definition:
       kind: ""
@@ -183,6 +191,7 @@ actions:
     permissions:
       - role: aerie_admin
       - role: user
+      - role: viewer
   - name: constraintViolations
     definition:
       kind: ""
@@ -256,11 +265,12 @@ custom_types:
     - name: UserCodeError
     - name: CodeLocation
     - name: ResourceSamplesResponse
-    - name: ConstraintViolationsResponse
+    - name: ConstraintResult
+    - name: ConstraintViolation
+    - name: Interval
   scalars:
     - name: ResourceSchema
     - name: ResourceSamples
-    - name: ConstraintViolations
     - name: MerlinSimulationFailureReason
     - name: ModelArguments
     - name: ActivityArguments

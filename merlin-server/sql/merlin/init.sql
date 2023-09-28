@@ -35,6 +35,7 @@ begin;
   \ir tables/plan.sql
   \ir tables/plan_collaborators.sql
   \ir tables/activity_directive.sql
+  \ir tables/activity_directive_changelog.sql
   \ir tables/activity_directive_validations.sql
   \ir tables/anchor_validation_status.sql
   \ir tables/simulation_template.sql
@@ -53,6 +54,7 @@ begin;
 
   \ir tables/mission_model_parameters.sql
   \ir tables/simulation_dataset.sql
+  \ir tables/simulation_extent.sql
   \ir tables/plan_dataset.sql
   \ir tables/constraint_run.sql
 
@@ -73,6 +75,7 @@ begin;
   \ir functions/public/begin_merge.sql
   \ir functions/public/commit_merge.sql
   \ir functions/public/create_snapshot.sql
+  \ir functions/public/restore_from_snapshot.sql
 
   -- Presets
   \ir tables/activity_presets.sql
@@ -80,6 +83,7 @@ begin;
   -- Table-specific Metadata
   \ir tables/metadata/activity_directive_tags.sql
   \ir tables/metadata/constraint_tags.sql
+  \ir tables/metadata/plan_snapshot_tags.sql
   \ir tables/metadata/plan_tags.sql
   \ir tables/metadata/snapshot_activity_tags.sql
 
@@ -97,9 +101,13 @@ begin;
 
   -- Hasura Functions
   \ir functions/hasura/activity_preset_functions.sql
+  \ir functions/hasura/snapshot_functions.sql
   \ir functions/hasura/delete_anchor_functions.sql
   \ir functions/hasura/hasura_functions.sql
   \ir functions/hasura/plan_branching_functions.sql
   \ir functions/hasura/plan_merge_functions.sql
+
+  -- Preload Data
+  \ir default_user_roles.sql;
 
 end;

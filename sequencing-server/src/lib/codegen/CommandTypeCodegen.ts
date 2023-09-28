@@ -133,31 +133,45 @@ ${doc}
 
   const value = `
 ${doc}
-function ${fswCommandName}(...args: [{ ${argsWithType.map(arg => arg.name + ': ' + arg.type).join(',')} }]) {
+function ${fswCommandName}(...args:
+\t\t| [ ${argsWithType.map(arg => convertObjectArgsToPassByPosition(arg.name,arg.type)).join(',')} ]
+\t\t| [{ ${argsWithType.map(arg => arg.name + ': ' + arg.type).join(',')} }]) {
   return ImmediateStem.new({
     stem: '${fswCommandName}',
-    arguments: args
+    arguments: typeof args[0] === 'object' && !Array.isArray(args[0]) && !(args[0] instanceof Variable) ? sortCommandArguments(args, argumentOrders['${fswCommandName}']) : commandArraysToObj(args, argumentOrders['${fswCommandName}']),
   }) as ${fswCommandName}_IMMEDIATE;
 }
-function ${fswCommandName}_STEP(...args: [{ ${argsWithType
-    .map(arg => arg.name + ': ' + arg.type + `${argumentTypeToVariable(arg.type)}`)
-    .join(',')} }]) {
+function ${fswCommandName}_STEP(...args:
+\t\t|[ ${argsWithType.map(arg => `${convertObjectArgsToPassByPosition(arg.name,arg.type)} ${argumentTypeToVariable(arg.type)}`).join(',')} ]
+\t\t|[{ ${argsWithType.map(arg => arg.name + ': ' + arg.type + `${argumentTypeToVariable(arg.type)}`).join(',')} }]) {
   return CommandStem.new({
     stem: '${fswCommandName}',
-    arguments: sortCommandArguments(args, argumentOrders['${fswCommandName}'])
+    arguments: typeof args[0] === 'object' && !Array.isArray(args[0]) && !(args[0] instanceof Variable) ? sortCommandArguments(args, argumentOrders['${fswCommandName}']) : commandArraysToObj(args, argumentOrders['${fswCommandName}']),
   }) as ${fswCommandName}_STEP;
 }`;
 
   const interfaces = `
-\tinterface ${fswCommandName}_IMMEDIATE extends ImmediateStem<[ [{ ${argsWithType
-    .map(arg => arg.name + ': ' + arg.type)
-    .join(',')} }] ]> {}
-\tinterface ${fswCommandName}_STEP extends CommandStem<[ [{ ${argsWithType
-    .map(arg => arg.name + ': ' + arg.type + `${argumentTypeToVariable(arg.type)}`)
-    .join(',')} }] ]> {}
-\tfunction ${fswCommandName}(...args: [{ ${argsWithType
-    .map(arg => arg.name + ': ' + arg.type)
-    .join(',')} }]) : ${fswCommandName}_IMMEDIATE`;
+\tinterface ${fswCommandName}_IMMEDIATE extends ImmediateStem<[
+\t\t | [ ${argsWithType
+      .map(arg => convertObjectArgsToPassByPosition(arg.name,arg.type))
+    .join(',')}]
+\t\t | [{ ${argsWithType
+      .map(arg => arg.name + ': ' + arg.type)
+      .join(',')} }]]> {}
+\tinterface ${fswCommandName}_STEP extends CommandStem<[
+\t\t | [ ${argsWithType
+      .map(arg => `${convertObjectArgsToPassByPosition(arg.name,arg.type)} ${argumentTypeToVariable(arg.type)}`)
+    .join(',')}]
+\t\t | [{ ${argsWithType
+      .map(arg => arg.name + ': ' + arg.type + `${argumentTypeToVariable(arg.type)}`)
+      .join(',')} }]]> {}
+\tfunction ${fswCommandName}(...args:
+\t\t| [ ${argsWithType
+      .map(arg => convertObjectArgsToPassByPosition(arg.name,arg.type))
+    .join(',')}]
+\t\t| [{ ${argsWithType
+      .map(arg => arg.name + ': ' + arg.type)
+      .join(',')} }]) : ${fswCommandName}_IMMEDIATE`;
 
   return {
     value,
@@ -166,20 +180,92 @@ function ${fswCommandName}_STEP(...args: [{ ${argsWithType
 }
 
 /**
+ * Converts object-based function arguments to pass-by-position format.
+ *
+ * This function takes a name and a type as input, where the type is represented
+ * using TypeScript type notation. It converts the type to pass-by-position format
+ * by replacing curly braces ('{}') with square brackets ('[]'), semicolons (';') with
+ * commas (','), and removing single quotes from property names in the type.
+ * The output will be a string representation of the name and the converted type in
+ * pass-by-position format.
+ *
+ * @param {string} name - The name of the function argument.
+ * @param {string} type - The TypeScript type representation of the function argument.
+ * @returns {string} A string representation of the name and the converted type in
+ * pass-by-position format.
+ *
+ * @example
+ * const name = "'person'";
+ * const type = "'TALL' | 'SHORT'";
+ * const result = convertObjectArgsToPassByPosition(name, type);
+ * // Output: "person : ['TALL' | 'SHORT']"
+ *
+ * @example
+ * const name = "'Television'";
+ * const type = "Array<{
+ *   ops_cat: 'FULLSCREEN' | 'WINDOWED';
+ *   channel_num: U16;
+ * }>";
+ * const result = convertObjectArgsToPassByPosition(name, type);
+ * // Output: "Television : Array<[
+ * //   ops_cat: 'FULLSCREEN' | 'WINDOWED',
+ * //   channel_num: U16
+ * // ]>"
+ */
+function convertObjectArgsToPassByPosition(name : string, type: string){
+  // remove ' around name
+  name = name.replace(/'/g, '');
+  // change [] to {} and ; to ,
+  type = type.replace(/[{;}]/g, (match) => {
+    switch (match) {
+      case '{':
+        return '[';
+      case '}':
+        return ']';
+      case ';':
+        return ',';
+      default:
+        return match;
+    }
+  });
+
+  /*
+   * The regex will remove single quotes only around property names (e.g., ops_cat) while
+   * ignoring single quotes around specific literals (e.g., FULLSCREEN, WINDOWED).
+   * For example:
+   * Input:
+   *     Array<[
+   *       'ops_cat': 'FULLSCREEN' | 'WINDOWED',
+   *       'channel_num': U16
+   *     ]>
+   *
+   * Output:
+   *     Array<[
+   *       ops_cat: 'FULLSCREEN' | 'WINDOWED',
+   *       channel_num: U16
+   *     ]>
+   */
+  type = type.replace(/'([^']+)':/g, '$1:')
+
+  return `${name} : ${type}`
+
+}
+
+/**
  * Match the argument types in the command dictionary with the corresponding variable types
  * for both local and parameter in the seqjson specification.
  */
 function argumentTypeToVariable(argumentType : string) : string{
   if (argumentType.startsWith('F')) {
-    return "| 'FLOAT'";
+    return "| VARIABLE_FLOAT";
   } else if (argumentType.startsWith('I')) {
-    return "| 'INT'";
+    return "| VARIABLE_INT";
   } else if (argumentType.startsWith('U')) {
-    return "| 'UINT'";
+    return "| VARIABLE_UINT";
   } else if (argumentType.startsWith('VarString')) {
-    return "| 'STRING'";
+    return "| VARIABLE_STRING";
   } else if (argumentType.startsWith('(')) {
-    return "| 'ENUM'";
+    return "| VARIABLE_ENUM";
   } else {
     return ''
   }

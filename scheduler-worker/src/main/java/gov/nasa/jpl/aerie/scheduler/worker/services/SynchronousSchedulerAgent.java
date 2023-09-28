@@ -10,6 +10,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 import gov.nasa.jpl.aerie.merlin.driver.ActivityDirectiveId;
 import gov.nasa.jpl.aerie.merlin.driver.MissionModel;
 import gov.nasa.jpl.aerie.merlin.driver.MissionModelLoader;
+import gov.nasa.jpl.aerie.merlin.driver.SimulationResults;
 import gov.nasa.jpl.aerie.merlin.protocol.model.SchedulerModel;
 import gov.nasa.jpl.aerie.merlin.protocol.model.SchedulerPlugin;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -42,21 +44,23 @@ import gov.nasa.jpl.aerie.scheduler.server.exceptions.NoSuchPlanException;
 import gov.nasa.jpl.aerie.scheduler.server.exceptions.NoSuchSpecificationException;
 import gov.nasa.jpl.aerie.scheduler.server.exceptions.ResultsProtocolFailure;
 import gov.nasa.jpl.aerie.scheduler.server.exceptions.SpecificationLoadException;
+import gov.nasa.jpl.aerie.scheduler.server.http.InvalidJsonException;
 import gov.nasa.jpl.aerie.scheduler.server.http.ResponseSerializers;
 import gov.nasa.jpl.aerie.scheduler.server.models.DatasetId;
+import gov.nasa.jpl.aerie.scheduler.server.models.ExternalProfiles;
 import gov.nasa.jpl.aerie.scheduler.server.models.GoalId;
 import gov.nasa.jpl.aerie.scheduler.server.models.GoalRecord;
 import gov.nasa.jpl.aerie.scheduler.server.models.GoalSource;
 import gov.nasa.jpl.aerie.scheduler.server.models.MerlinPlan;
 import gov.nasa.jpl.aerie.scheduler.server.models.PlanId;
 import gov.nasa.jpl.aerie.scheduler.server.models.PlanMetadata;
+import gov.nasa.jpl.aerie.scheduler.server.models.ResourceType;
 import gov.nasa.jpl.aerie.scheduler.server.models.SchedulingCompilationError;
 import gov.nasa.jpl.aerie.scheduler.server.models.SchedulingDSL;
 import gov.nasa.jpl.aerie.scheduler.server.models.Specification;
 import gov.nasa.jpl.aerie.scheduler.server.remotes.postgres.GoalBuilder;
-import gov.nasa.jpl.aerie.scheduler.server.services.MissionModelService;
-import gov.nasa.jpl.aerie.scheduler.server.services.PlanService;
-import gov.nasa.jpl.aerie.scheduler.server.services.PlanServiceException;
+import gov.nasa.jpl.aerie.scheduler.server.services.MerlinService;
+import gov.nasa.jpl.aerie.scheduler.server.services.MerlinServiceException;
 import gov.nasa.jpl.aerie.scheduler.server.services.RevisionData;
 import gov.nasa.jpl.aerie.scheduler.server.services.ScheduleRequest;
 import gov.nasa.jpl.aerie.scheduler.server.services.ScheduleResults;
@@ -70,8 +74,7 @@ import org.apache.commons.lang3.tuple.Pair;
 /**
  * agent that handles posed scheduling requests by blocking the requester thread until scheduling is complete
  *
- * @param planService interface for querying plan details from merlin
- * @param missionModelService interface for querying mission model details from merlin
+ * @param merlinService interface for querying plan and mission model details from merlin
  * @param modelJarsDir path to parent directory for mission model jars (interim backdoor jar file access)
  * @param goalsJarPath path to jar file to load scheduling goals from (interim solution for user input goals)
  * @param outputMode how the scheduling output should be returned to aerie (eg overwrite or new container)
@@ -79,8 +82,7 @@ import org.apache.commons.lang3.tuple.Pair;
 //TODO: will eventually need scheduling goal service arg to pull goals from scheduler's own data store
 public record SynchronousSchedulerAgent(
     SpecificationService specificationService,
-    PlanService.OwnerRole planService,
-    MissionModelService missionModelService,
+    MerlinService.OwnerRole merlinService,
     Path modelJarsDir,
     Path goalsJarPath,
     PlanOutputMode outputMode,
@@ -89,8 +91,7 @@ public record SynchronousSchedulerAgent(
     implements SchedulerAgent
 {
   public SynchronousSchedulerAgent {
-    Objects.requireNonNull(planService);
-    Objects.requireNonNull(missionModelService);
+    Objects.requireNonNull(merlinService);
     Objects.requireNonNull(modelJarsDir);
     Objects.requireNonNull(goalsJarPath);
     Objects.requireNonNull(schedulingDSLCompilationService);
@@ -112,7 +113,7 @@ public record SynchronousSchedulerAgent(
       //TODO: maybe some kind of high level db transaction wrapping entire read/update of target plan revision
 
       final var specification = specificationService.getSpecification(request.specificationId());
-      final var planMetadata = planService.getPlanMetadata(specification.planId());
+      final var planMetadata = merlinService.getPlanMetadata(specification.planId());
       ensureRequestIsCurrent(request);
       ensurePlanRevisionMatch(specification, planMetadata.planRev());
       //create scheduler problem seeded with initial plan
@@ -128,19 +129,22 @@ public record SynchronousSchedulerAgent(
             simulationFacade,
             schedulerMissionModel.schedulerModel()
         );
+        final var externalProfiles = loadExternalProfiles(planMetadata.planId());
+        final var initialSimulationResults = loadSimulationResults(planMetadata);
         //seed the problem with the initial plan contents
         final var loadedPlanComponents = loadInitialPlan(planMetadata, problem);
-        problem.setInitialPlan(loadedPlanComponents.schedulerPlan());
-
+        problem.setInitialPlan(loadedPlanComponents.schedulerPlan(), initialSimulationResults);
+        problem.setExternalProfile(externalProfiles.realProfiles(), externalProfiles.discreteProfiles());
         //apply constraints/goals to the problem
         final var compiledGlobalSchedulingConditions = new ArrayList<SchedulingCondition>();
         final var failedGlobalSchedulingConditions = new ArrayList<List<SchedulingCompilationError.UserCodeError>>();
         specification.globalSchedulingConditions().forEach($ -> {
           if (!$.enabled()) return;
           final var result = schedulingDSLCompilationService.compileGlobalSchedulingCondition(
-              missionModelService,
+              merlinService,
               planMetadata.planId(),
-              $.source().source());
+              $.source().source(),
+              externalProfiles.resourceTypes());
           if (result instanceof SchedulingDSLCompilationService.SchedulingDSLCompilationResult.Success<SchedulingDSL.ConditionSpecifier> r) {
             compiledGlobalSchedulingConditions.addAll(conditionBuilder(r.value(), problem));
           } else if (result instanceof SchedulingDSLCompilationService.SchedulingDSLCompilationResult.Error<SchedulingDSL.ConditionSpecifier> r) {
@@ -171,10 +175,11 @@ public record SynchronousSchedulerAgent(
         for (final var goalRecord : specification.goalsByPriority()) {
           if (!goalRecord.enabled()) continue;
           final var result = compileGoalDefinition(
-              missionModelService,
+              merlinService,
               planMetadata.planId(),
               goalRecord.definition(),
-              schedulingDSLCompilationService);
+              schedulingDSLCompilationService,
+              externalProfiles.resourceTypes());
           if (result instanceof SchedulingDSLCompilationService.SchedulingDSLCompilationResult.Success<SchedulingDSL.GoalSpecifier> r) {
             compiledGoals.add(Pair.of(goalRecord, r.value()));
           } else if (result instanceof SchedulingDSLCompilationService.SchedulingDSLCompilationResult.Error<SchedulingDSL.GoalSpecifier> r) {
@@ -226,7 +231,8 @@ public record SynchronousSchedulerAgent(
             solutionPlan,
             activityToGoalId
         );
-        final var datasetId = storeSimulationResults(planningHorizon, simulationFacade, planMetadata, instancesToIds);
+        final var planMetadataAfterChanges = merlinService.getPlanMetadata(specification.planId());
+        final var datasetId = storeSimulationResults(planningHorizon, simulationFacade, planMetadataAfterChanges, instancesToIds);
         //collect results and notify subscribers of success
         final var results = collectResults(solutionPlan, instancesToIds, goals);
         writer.succeedWith(results, datasetId);
@@ -254,7 +260,7 @@ public record SynchronousSchedulerAgent(
           .message(e.toString())
           .data(ResponseSerializers.serializeNoSuchPlanException(e))
           .trace(e));
-    } catch (final PlanServiceException e) {
+    } catch (final MerlinServiceException e) {
       writer.failWith(b -> b
           .type("PLAN_SERVICE_EXCEPTION")
           .message(e.toString())
@@ -267,9 +273,23 @@ public record SynchronousSchedulerAgent(
     }
   }
 
+  private Optional<SimulationResults> loadSimulationResults(final PlanMetadata planMetadata){
+    try {
+      return merlinService.getSimulationResults(planMetadata);
+    } catch (MerlinServiceException | IOException | InvalidJsonException e) {
+      throw new ResultsProtocolFailure(e);
+    }
+  }
+
+  private ExternalProfiles loadExternalProfiles(final PlanId planId)
+  throws MerlinServiceException, IOException
+  {
+    return merlinService.getExternalProfiles(planId);
+  }
+
   private Optional<DatasetId> storeSimulationResults(PlanningHorizon planningHorizon, SimulationFacade simulationFacade, PlanMetadata planMetadata,
                                                      final Map<SchedulingActivityDirective, ActivityDirectiveId> schedDirectiveToMerlinId)
-  throws PlanServiceException, IOException
+  throws MerlinServiceException, IOException
   {
     //finish simulation until end of horizon before posting results
     try {
@@ -288,9 +308,9 @@ public record SynchronousSchedulerAgent(
             Map.Entry::getValue,
             (a) -> schedID_to_MerlinID.get(a.getKey())));
     if(simID_to_MerlinID.values().containsAll(schedDirectiveToMerlinId.values()) && schedDirectiveToMerlinId.values().containsAll(simID_to_MerlinID.values())){
-      return Optional.of(planService.storeSimulationResults(planMetadata,
-                                                simulationFacade.getLatestDriverSimulationResults(),
-                                                            simID_to_MerlinID));
+      return Optional.of(merlinService.storeSimulationResults(planMetadata,
+                                                              simulationFacade.getLatestDriverSimulationResults(),
+                                                              simID_to_MerlinID));
     } else{
       //schedule in simulation is inconsistent with current state of the plan (user probably disabled simulation for some of the goals)
       return Optional.empty();
@@ -298,15 +318,17 @@ public record SynchronousSchedulerAgent(
   }
 
   private static SchedulingDSLCompilationService.SchedulingDSLCompilationResult<SchedulingDSL.GoalSpecifier> compileGoalDefinition(
-      final MissionModelService missionModelService,
+      final MerlinService.ReaderRole merlinService,
       final PlanId planId,
       final GoalSource goalDefinition,
-      final SchedulingDSLCompilationService schedulingDSLCompilationService)
+      final SchedulingDSLCompilationService schedulingDSLCompilationService,
+      final Collection<ResourceType> additionalResourceTypes)
   {
     return schedulingDSLCompilationService.compileSchedulingGoalDSL(
-        missionModelService,
+        merlinService,
         planId,
-        goalDefinition.source()
+        goalDefinition.source(),
+        additionalResourceTypes
     );
   }
 
@@ -324,9 +346,9 @@ public record SynchronousSchedulerAgent(
    * @throws ResultsProtocolFailure when the requested plan cannot be found, or aerie could not be reached
    */
   private long getMerlinPlanRev(final PlanId planId)
-  throws PlanServiceException, NoSuchPlanException, IOException
+  throws MerlinServiceException, NoSuchPlanException, IOException
   {
-    return planService.getPlanRevision(planId);
+    return merlinService.getPlanRevision(planId);
   }
   /**
    * confirms that specification revision still matches that expected by the scheduling request
@@ -385,7 +407,7 @@ public record SynchronousSchedulerAgent(
   private PlanComponents loadInitialPlan(final PlanMetadata planMetadata, final Problem problem) {
     //TODO: maybe paranoid check if plan rev has changed since original metadata?
     try {
-      final var merlinPlan =  planService.getPlanActivityDirectives(planMetadata, problem);
+      final var merlinPlan =  merlinService.getPlanActivityDirectives(planMetadata, problem);
       final Map<SchedulingActivityDirectiveId, ActivityDirectiveId> schedulingIdToDirectiveId = new HashMap<>();
       final var plan = new PlanInMemory();
       final var activityTypes = problem.getActivityTypes().stream().collect(Collectors.toMap(ActivityType::getName, at -> at));
@@ -548,10 +570,10 @@ public record SynchronousSchedulerAgent(
     try {
       switch (this.outputMode) {
         case CreateNewOutputPlan -> {
-          return planService.createNewPlanWithActivityDirectives(planMetadata, newPlan, goalToActivity).getValue();
+          return merlinService.createNewPlanWithActivityDirectives(planMetadata, newPlan, goalToActivity).getValue();
         }
         case UpdateInputPlanWithNewActivities -> {
-          return planService.updatePlanActivityDirectives(
+          return merlinService.updatePlanActivityDirectives(
               planMetadata.planId(),
               idsFromInitialPlan,
               initialPlan,

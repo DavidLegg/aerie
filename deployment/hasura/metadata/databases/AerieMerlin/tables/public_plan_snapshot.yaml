@@ -11,22 +11,48 @@ object_relationships:
       remote_table:
         name: plan
         schema: public
+array_relationships:
+  - name: activities
+    using:
+      foreign_key_constraint_on:
+        column: snapshot_id
+        table:
+          name: plan_snapshot_activities
+          schema: public
+  - name: tags
+    using:
+      foreign_key_constraint_on:
+        column: snapshot_id
+        table:
+          name: plan_snapshot_tags
+          schema: metadata
 select_permissions:
   - role: aerie_admin
     permission:
-      columns: [snapshot_id, plan_id, revision, name, duration, start_time]
+      columns: '*'
       filter: {}
       allow_aggregations: true
   - role: user
     permission:
-      columns: [snapshot_id, plan_id, revision, name, duration, start_time]
+      columns: '*'
       filter: {}
       allow_aggregations: true
   - role: viewer
     permission:
-      columns: [snapshot_id, plan_id, revision, name, duration, start_time]
+      columns: '*'
       filter: {}
       allow_aggregations: true
+update_permissions:
+  - role: aerie_admin
+    permission:
+      columns: [description, taken_by]
+      filter: {}
+  - role: user
+    permission:
+      columns: [description]
+      filter: {"plan":{"_or":[
+        {"owner":{"_eq":"X-Hasura-User-Id"}},
+        {"collaborators":{"collaborator":{"_eq":"X-Hasura-User-Id"}}}]}}
 delete_permissions:
   - role: aerie_admin
     permission:
