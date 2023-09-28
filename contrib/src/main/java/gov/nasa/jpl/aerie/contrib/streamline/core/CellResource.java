@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
@@ -45,5 +46,9 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
 
   static <D extends Dynamics<?, D>> void set(CellResource<D> resource, D newDynamics) {
     resource.emit(DynamicsMonad.effect(x -> newDynamics));
+  }
+
+  static <D extends Dynamics<?, D>> void set(CellResource<D> resource, Expiring<D> newDynamics) {
+    resource.emit(ErrorCatchingMonad.<Expiring<D>, Expiring<D>>lift($ -> newDynamics)::apply);
   }
 }

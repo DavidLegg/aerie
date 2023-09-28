@@ -55,16 +55,24 @@ public final class PolynomialResources {
     return unitAware(asPolynomial(discrete.value()), discrete.unit());
   }
 
-  public static Resource<Polynomial> add(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return ResourceMonad.map(p, q, Polynomial::add);
+  @SafeVarargs
+  public static Resource<Polynomial> add(Resource<Polynomial>... summands) {
+    return Arrays.stream(summands)
+        .reduce(constant(0), (p, q) -> ResourceMonad.map(p, q, Polynomial::add));
   }
 
   public static Resource<Polynomial> subtract(Resource<Polynomial> p, Resource<Polynomial> q) {
     return ResourceMonad.map(p, q, Polynomial::subtract);
   }
 
-  public static Resource<Polynomial> multiply(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return ResourceMonad.map(p, q, Polynomial::multiply);
+  public static Resource<Polynomial> negate(Resource<Polynomial> p) {
+    return multiply(constant(-1), p);
+  }
+
+  @SafeVarargs
+  public static Resource<Polynomial> multiply(Resource<Polynomial>... factors) {
+    return Arrays.stream(factors)
+                 .reduce(constant(1), (p, q) -> ResourceMonad.map(p, q, Polynomial::multiply));
   }
 
   public static Resource<Polynomial> divide(Resource<Polynomial> p, Resource<Discrete<Double>> q) {
@@ -85,7 +93,7 @@ public final class PolynomialResources {
     var clampedStartingValue = clamp(constant(startingValue), minimum, maximum);
     // Bootstrap integral by initially using a constant "integral" resource:
     var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, clampedStartingValue);
-    // This way, the cell is initialized to the correct dynamics.
+    // This way, the resource is initialized to the correct dynamics.
     var cell = cellResource(initialEffectiveIntegrand.getDynamics().map($ -> neverExpiring($.data().integral(currentValue(clampedStartingValue)))));
     var effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
     // Use integrand's expiry but not integral's, since we're refreshing the integral

@@ -41,4 +41,8 @@ public final class DiscreteResourceMonad {
   public static <A, B> Function<Resource<Discrete<A>>, Resource<Discrete<B>>> lift(Function<A, B> f) {
     return a -> map(a, f);
   }
+
+  public static <A, B, C> BiFunction<Resource<Discrete<A>>, Resource<Discrete<B>>, Resource<Discrete<C>>> lift(BiFunction<A, B, C> f) {
+    return (a, b) -> map(a, b, f);
+  }
 }

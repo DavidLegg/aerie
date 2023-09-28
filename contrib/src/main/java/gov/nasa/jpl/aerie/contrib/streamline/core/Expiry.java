@@ -60,4 +60,9 @@ public record Expiry(Optional<Duration> value) {
   public boolean noLongerThan(Expiry other) {
     return this.compareTo(other) <= 0;
   }
+
+  @Override
+  public String toString() {
+    return value.map(Duration::toString).orElse("NEVER");
+  }
 }

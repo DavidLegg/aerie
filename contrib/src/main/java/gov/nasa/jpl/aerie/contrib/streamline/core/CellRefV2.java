@@ -18,7 +18,7 @@ public final class CellRefV2 {
   private CellRefV2() {}
 
   /**
-   * Allocate a new cell with an explicitly given effect type and effect trait.
+   * Allocate a new resource with an explicitly given effect type and effect trait.
    */
   public static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> CellRef<E, Cell<D>> allocate(ErrorCatching<Expiring<D>> initialDynamics, EffectTrait<E> effectTrait) {
     return CellRef.allocate(new Cell<>(initialDynamics), new CellType<>() {
@@ -60,7 +60,7 @@ public final class CellRefV2 {
   public static <D extends Dynamics<?, D>> EffectTrait<DynamicsEffect<D>> noncommutingEffects() {
     return resolvingConcurrencyBy((left, right) -> x -> {
           throw new UnsupportedOperationException(
-              "Concurrent effects are not supported on this cell.");
+              "Concurrent effects are not supported on this resource.");
         });
   }
 

@@ -28,7 +28,6 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.duration;
 import static org.junit.jupiter.api.Assertions.*;
 
-@Nested
 @ExtendWith(MerlinExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
 class ClampedIntegralTest {

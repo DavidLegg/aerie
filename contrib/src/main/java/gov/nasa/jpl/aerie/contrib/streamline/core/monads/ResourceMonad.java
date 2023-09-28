@@ -52,4 +52,8 @@ public final class ResourceMonad {
   public static <A, B> Function<Resource<A>, Resource<B>> lift(Function<A, B> f) {
     return a -> map(a, f);
   }
+
+  public static <A, B, C> BiFunction<Resource<A>, Resource<B>, Resource<C>> lift(BiFunction<A, B, C> f) {
+    return (a, b) -> map(a, b, f);
+  }
 }

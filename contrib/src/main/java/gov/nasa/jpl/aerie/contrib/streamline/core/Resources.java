@@ -41,8 +41,8 @@ public final class Resources {
       return currentValue(CLOCK);
     } catch (EmptyDynamicCellException | IllegalArgumentException e) {
       // If we're running unit tests, several simulations can happen without reloading the Resources class.
-      // In that case, we'll have discarded the clock cell we were using, and get the above exception.
-      // REVIEW: Is there a cleaner way to make sure this cell gets (re-)initialized?
+      // In that case, we'll have discarded the clock resource we were using, and get the above exception.
+      // REVIEW: Is there a cleaner way to make sure this resource gets (re-)initialized?
       CLOCK = cellResource(new ClockDynamics(ZERO));
       return currentValue(CLOCK);
     }
@@ -89,10 +89,10 @@ public final class Resources {
   }
 
   /**
-   * Cache this resource in a cell.
+   * Cache this resource in a resource.
    *
    * <p>
-   *   Updates the cell when resource changes dynamics.
+   *   Updates the resource when resource changes dynamics.
    *   This can be used to isolate a resource from effects
    *   which don't change the dynamics, so Aerie samples that
    *   resource only when strictly necessary.
@@ -132,7 +132,7 @@ public final class Resources {
    * <p>
    *   Unlike {@link Resources#cache}, this method does *not* introduce
    *   a delay between the source and derived resources.
-   *   Signalling resources use a cell "in parallel" rather than "in series"
+   *   Signalling resources use a resource "in parallel" rather than "in series"
    *   with the derivation process, thereby avoiding the delay.
    *   Like regular derived resources, signalling resources calculate their value
    *   through the derivation every time they are sampled.

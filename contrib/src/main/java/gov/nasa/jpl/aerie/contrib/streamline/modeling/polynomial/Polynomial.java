@@ -37,13 +37,17 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   private static final int MAX_RANGE_FOR_ROOT_SEARCH = 2;
 
   public static Polynomial polynomial(double... coefficients) {
+    for (double c : coefficients) {
+      // If any coefficient is NaN, the entire polynomial is non-calculable
+      // Similarly, the first coefficient that's infinite dominates the entire polynomial
+      if (!Double.isFinite(c)) return new Polynomial(new double[] {c});
+    }
     int n = coefficients.length;
     if (n == 0) {
       return new Polynomial(new double[] { 0.0 });
     }
     while (n > 1 && coefficients[n - 1] == 0) --n;
-    final double[] newCoefficients = Arrays.copyOf(coefficients, n);
-    return new Polynomial(newCoefficients);
+    return new Polynomial(Arrays.copyOf(coefficients, n));
   }
 
   @Override
@@ -62,6 +66,13 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   public boolean isConstant() {
     return degree() == 0;
+  }
+
+  public boolean isNonNormalizable() {
+    for (var coefficient : coefficients()) {
+      if (!Double.isFinite(coefficient)) return true;
+    }
+    return false;
   }
 
   public Polynomial add(Polynomial other) {
