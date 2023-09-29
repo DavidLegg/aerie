@@ -191,6 +191,10 @@ public final class PolynomialResources {
     return ResourceMonad.bind(p, q, (p$, q$) -> ExpiringToResourceMonad.unit(p$.max(q$)));
   }
 
+  public static Resource<Polynomial> abs(Resource<Polynomial> p) {
+    return max(p, negate(p));
+  }
+
   public static Resource<Polynomial> clamp(Resource<Polynomial> p, Resource<Polynomial> lowerBound, Resource<Polynomial> upperBound) {
     return ResourceMonad.bind(
         lessThan(upperBound, lowerBound),

@@ -88,7 +88,7 @@ public final class Tracing {
 
   public static Condition trace(String name, Condition condition) {
     return (positive, atEarliest, atLatest) ->
-        traceAction(name, () -> condition.nextSatisfied(positive, atEarliest, atLatest));
+        traceAction(name + " evaluate (%s, %s, %s)".formatted(positive, atEarliest, atLatest), () -> condition.nextSatisfied(positive, atEarliest, atLatest));
   }
 
   public static Supplier<Condition> trace(String name, Supplier<Condition> condition) {

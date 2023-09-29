@@ -7,7 +7,7 @@ import gov.nasa.jpl.aerie.merlin.framework.annotations.Export.Parameter;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.set;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 
-@ActivityType("gov.nasa.jpl.aerie.streamline_demo.ChangeDesiredRate")
+@ActivityType("ChangeDesiredRate")
 public class ChangeDesiredRate {
   @Parameter
   public Bucket bucket;

@@ -47,13 +47,14 @@ public final class CellRefV2 {
         cell.dynamics = ErrorCatchingMonad.map(cell.initialDynamics, d ->
             expiring(d.data().step(cell.elapsedTime), d.expiry().minus(cell.elapsedTime)));
       }
-
-      @Override
-      public Optional<Duration> getExpiry(Cell<D> cell) {
-        return cell.dynamics.match(
-            expiring -> expiring.expiry().value(),
-            exception -> Optional.empty());
-      }
+// DEBUG: Trying this without exposing expiry info to Aerie.
+// We always update cells ourselves, and our notion of expiry clashes a little with Aerie's on some edge-cases.
+//      @Override
+//      public Optional<Duration> getExpiry(Cell<D> cell) {
+//        return cell.dynamics.match(
+//            expiring -> expiring.expiry().value(),
+//            exception -> Optional.empty());
+//      }
     });
   }
 
