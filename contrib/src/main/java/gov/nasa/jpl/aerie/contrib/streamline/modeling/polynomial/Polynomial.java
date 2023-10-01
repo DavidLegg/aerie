@@ -37,11 +37,6 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   private static final int MAX_RANGE_FOR_ROOT_SEARCH = 2;
 
   public static Polynomial polynomial(double... coefficients) {
-    for (double c : coefficients) {
-      // If any coefficient is NaN, the entire polynomial is non-calculable
-      // Similarly, the first coefficient that's infinite dominates the entire polynomial
-      if (!Double.isFinite(c)) return new Polynomial(new double[] {c});
-    }
     int n = coefficients.length;
     if (n == 0) {
       return new Polynomial(new double[] { 0.0 });
@@ -57,7 +52,7 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   @Override
   public Polynomial step(Duration t) {
-    return polynomial(shift(coefficients(), t.ratioOver(SECOND)));
+    return t.isEqualTo(ZERO) ? this : polynomial(shift(coefficients(), t.ratioOver(SECOND)));
   }
 
   public int degree() {
@@ -68,11 +63,8 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
     return degree() == 0;
   }
 
-  public boolean isNonNormalizable() {
-    for (var coefficient : coefficients()) {
-      if (!Double.isFinite(coefficient)) return true;
-    }
-    return false;
+  public boolean isNonFinite() {
+    return Arrays.stream(coefficients()).anyMatch(c -> !Double.isFinite(c));
   }
 
   public Polynomial add(Polynomial other) {
@@ -172,7 +164,7 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   private Expiring<Discrete<Boolean>> find(Predicate<Duration> timePredicate, double target) {
     final boolean currentValue = timePredicate.test(ZERO);
-    final var expiry = this.isConstant() ? NEVER : expiry(findFuturePreImage(target)
+    final var expiry = this.isConstant() || this.isNonFinite() ? NEVER : expiry(findFuturePreImage(target)
         .flatMap(t -> IntStream.rangeClosed(-MAX_RANGE_FOR_ROOT_SEARCH, MAX_RANGE_FOR_ROOT_SEARCH)
             .mapToObj(i -> t.plus(EPSILON.times(i))))
         .filter(t -> (timePredicate.test(t) ^ currentValue) && t.isPositive())
@@ -221,16 +213,9 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
    * Finds all occasions in the future when this function will reach the target value.
    */
   private Stream<Duration> findFuturePreImage(double target) {
-    // add a check for an infinite target (i.e. unbounded above/below)
-    if (Math.abs(target) == Double.POSITIVE_INFINITY) {
+    // add a check for an infinite target (i.e. unbounded above/below) or a poorly behaved polynomial
+    if (!Double.isFinite(target) || this.isNonFinite()) {
       return Stream.empty();
-    }
-    // add a check for an infinite coefficient (relevant in the extremely specific case of an unbounded upper bound
-    //    being represented by a Resource<Polynomial> that happens to take the value of infinity)
-    for (double coeff : this.coefficients()) {
-      if (Math.abs(coeff) == Double.POSITIVE_INFINITY) {
-        return Stream.empty();
-      }
     }
 
     final double[] shiftedCoefficients = add(polynomial(-target)).coefficients();

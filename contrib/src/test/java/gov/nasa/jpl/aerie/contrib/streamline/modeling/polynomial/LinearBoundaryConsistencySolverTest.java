@@ -5,8 +5,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.Domain;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Domain;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.junit.jupiter.api.Nested;
@@ -17,17 +16,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.Comparison.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.LinearExpression.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.LinearExpression.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
-import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static org.junit.jupiter.api.Assertions.*;
 
-class LinearArcConsistencySolverTest {
+class LinearBoundaryConsistencySolverTest {
   @Nested
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
@@ -38,7 +35,7 @@ class LinearArcConsistencySolverTest {
     public SingleVariableSingleConstraint() {
       Resources.init();
 
-      var solver = new LinearArcConsistencySolver("SingleVariableSingleConstraint");
+      var solver = new LinearBoundaryConsistencySolver("SingleVariableSingleConstraint");
       var v = solver.variable("v", Domain::upperBound);
       result = v.resource();
       solver.declare(lx(v), LessThanOrEquals, lx(driver));
@@ -80,7 +77,7 @@ class LinearArcConsistencySolverTest {
     public SingleVariableMultipleConstraint() {
       Resources.init();
 
-      var solver = new LinearArcConsistencySolver("SingleVariableMultipleConstraint");
+      var solver = new LinearBoundaryConsistencySolver("SingleVariableMultipleConstraint");
       var v = solver.variable("v", Domain::lowerBound);
       result = v.resource();
       solver.declare(lx(v), GreaterThanOrEquals, lx(lowerBound1));
@@ -154,7 +151,7 @@ class LinearArcConsistencySolverTest {
     public ScalingConstraint() {
       Resources.init();
 
-      var solver = new LinearArcConsistencySolver("ScalingConstraint");
+      var solver = new LinearBoundaryConsistencySolver("ScalingConstraint");
       var v = solver.variable("v", Domain::upperBound);
       result = v.resource();
       solver.declare(lx(v).multiply(4), LessThanOrEquals, lx(driver));
@@ -177,68 +174,6 @@ class LinearArcConsistencySolverTest {
   @Nested
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
-  class CalculusConstraint {
-    CellResource<Polynomial> driver = cellResource(polynomial(10, 20, 30));
-    Resource<Polynomial> derivative, integral;
-
-    public CalculusConstraint() {
-      Resources.init();
-
-      var solver = new LinearArcConsistencySolver("CalculusConstraint");
-      var v = solver.variable("v", Domain::upperBound);
-      var vPrime = solver.variable("vPrime", Domain::upperBound);
-      var vIntegral = solver.variable("vIntegral", Domain::upperBound);
-      derivative = vPrime.resource();
-      integral = vIntegral.resource();
-      solver.declare(lx(v), LessThanOrEquals, lx(driver));
-      solver.declare(lx(vPrime), Equals, lx(v).derivative());
-      solver.declare(lx(vIntegral), Equals, lx(v).integral(integral));
-    }
-
-    @Test
-    void derivative_can_be_solved_for() {
-      settle();
-      assertEquals(polynomial(20, 60), currentData(derivative));
-    }
-
-    @Test
-    void derivative_is_respected_for_later_solutions() {
-      set(driver, polynomial(20, 4, -9));
-      settle();
-      assertEquals(polynomial(4, -18), currentData(derivative));
-    }
-
-    @Test
-    void integral_can_be_sovled_for() {
-      settle();
-      assertEquals(polynomial(0, 10, 10, 10), currentData(integral));
-    }
-
-    @Test
-    void integral_is_respected_for_later_solutions() {
-      set(driver, polynomial(20, 4, -9));
-      settle();
-      assertEquals(polynomial(0, 20, 2, -3), currentData(integral));
-    }
-
-    @Test
-    void integral_is_continuous_across_solver_iterations() {
-      settle();
-      assertEquals(polynomial(0, 10, 10, 10), currentData(integral));
-      delay(SECOND);
-      // 0 + 10(x + 1) + 10(x + 1)^2 + 10(x + 1)^3 = 30 + 60x + 40x^2 + 10x^3
-      assertEquals(polynomial(30, 60, 40, 10), currentData(integral));
-      set(driver, polynomial(20, 4, -9));
-      settle();
-      // Notice high-order coefficients are completely determined by driver,
-      // but value is completely determined by current value.
-      assertEquals(polynomial(30, 20, 2, -3), currentData(integral));
-    }
-  }
-
-  @Nested
-  @ExtendWith(MerlinExtension.class)
-  @TestInstance(Lifecycle.PER_CLASS)
   class MultipleVariables {
     CellResource<Polynomial> upperBound = cellResource(polynomial(10));
     CellResource<Polynomial> upperBoundOnC = cellResource(polynomial(5));
@@ -247,7 +182,7 @@ class LinearArcConsistencySolverTest {
     public MultipleVariables() {
       Resources.init();
 
-      var solver = new LinearArcConsistencySolver("MultipleVariablesSingleConstraint");
+      var solver = new LinearBoundaryConsistencySolver("MultipleVariablesSingleConstraint");
       var a = solver.variable("a", Domain::upperBound);
       var b = solver.variable("b", Domain::upperBound);
       var c = solver.variable("c", Domain::upperBound);

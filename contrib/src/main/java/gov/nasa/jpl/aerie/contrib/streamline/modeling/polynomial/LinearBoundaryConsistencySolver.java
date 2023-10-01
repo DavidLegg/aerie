@@ -7,25 +7,18 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Reactions;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
@@ -33,12 +26,10 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
-import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Tracing.trace;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.GeneralConstraint.constraint;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.InequalityComparison.GreaterThanOrEquals;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearArcConsistencySolver.InequalityComparison.LessThanOrEquals;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.GeneralConstraint.constraint;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.InequalityComparison.GreaterThanOrEquals;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.InequalityComparison.LessThanOrEquals;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.subtract;
@@ -58,14 +49,14 @@ import static java.util.stream.Collectors.toMap;
  *   like a substep of the Aerie simulation step.
  * </p>
  */
-public final class LinearArcConsistencySolver {
+public final class LinearBoundaryConsistencySolver {
   private final String name;
   private final List<Resource<Polynomial>> drivenTerms = new LinkedList<>();
   private final List<Variable> variables = new LinkedList<>();
   private final List<DirectionalConstraint> constraints = new LinkedList<>();
   private final Map<Variable, Set<DirectionalConstraint>> neighboringConstraints = new HashMap<>();
 
-  public LinearArcConsistencySolver(String name) {
+  public LinearBoundaryConsistencySolver(String name) {
     this.name = name;
 
     spawn(() -> {
@@ -76,11 +67,11 @@ public final class LinearArcConsistencySolver {
       // After that, solve whenever any of the driven terms change
       // OR a solved variable changes (which can only happen when it expires)
       Reactions.whenever(
-          trace("Repeat Solve", () -> Stream.concat(
+          () -> Stream.concat(
               drivenTerms.stream(),
               variables.stream().map(Variable::resource))
                       .map(Resources::dynamicsChange)
-                      .reduce(Condition.FALSE, (c1, c2) -> c1.or(c2))),
+                      .reduce(Condition.FALSE, (c1, c2) -> c1.or(c2)),
           this::solve);
     });
   }
@@ -114,31 +105,28 @@ public final class LinearArcConsistencySolver {
   }
 
   private void solve() {
-    System.out.println("DEBUG: solving...");
-    final var domains = variables.stream().collect(toMap(identity(), VariableDomain::new));
+    final var domains = variables.stream().collect(toMap(identity(), Domain::new));
     final Queue<DirectionalConstraint> constraintsLeft = new LinkedList<>(constraints);
     DirectionalConstraint constraint;
     try {
       // While we either have constraints to apply or domains to solve...
-      while (!constraintsLeft.isEmpty() || domains.values().stream().anyMatch(VariableDomain::isUnsolved)) {
+      while (!constraintsLeft.isEmpty() || domains.values().stream().anyMatch(Domain::isUnsolved)) {
         // Apply all constraints through simple arc consistency
         while ((constraint = constraintsLeft.poll()) != null) {
-          var D = domains.get(constraint.constrainedVariable.variable);
-          var k = constraint.constrainedVariable.derivativeOrder;
+          var V = constraint.constrainedVariable;
+          var D = domains.get(V);
           var newBound = constraint.bound.apply(domains).getDynamics().getOrThrow();
           boolean domainChanged = switch (constraint.comparison) {
-            case LessThanOrEquals -> D.derivativeDomain(k).restrictUpper(newBound);
-            case GreaterThanOrEquals -> D.derivativeDomain(k).restrictLower(newBound);
+            case LessThanOrEquals -> D.restrictUpper(newBound);
+            case GreaterThanOrEquals -> D.restrictLower(newBound);
           };
           if (domainChanged) {
-            System.out.printf(
-                "DEBUG: Used %s^(%d) %s %s to restrict to %s%n",
-                constraint.constrainedVariable.variable, k, constraint.comparison, newBound, D);
             if (D.isEmpty()) {
               throw new IllegalStateException(
                   "LinearArcConsistencySolver %s failed. Domain for %s is empty: [%s, %s]".formatted(
                       name, D.variable, D.lowerBound, D.upperBound));
             }
+            // TODO: Make this more efficient by not adding constraints that are already in the queue.
             constraintsLeft.addAll(neighboringConstraints.get(D.variable));
           }
         }
@@ -147,11 +135,10 @@ public final class LinearArcConsistencySolver {
         variables
             .stream()
             .map(domains::get)
-            .filter(VariableDomain::isUnsolved)
+            .filter(Domain::isUnsolved)
             .findFirst()
             .ifPresent(D -> {
               D.lowerBound = D.upperBound = D.variable.selectionPolicy.apply(D);
-              System.out.printf("DEBUG: Stalled. Selecting %s = %s%n", D.variable, D.lowerBound);
               constraintsLeft.addAll(neighboringConstraints.get(D.variable));
             });
       }
@@ -164,12 +151,10 @@ public final class LinearArcConsistencySolver {
             return D.lowerBound.expiry().or(D.upperBound.expiry());
           })
           .reduce(Expiry.NEVER, Expiry::or);
-//      set(this.solutionExpiry, solutionExpiry); // DEBUG
       for (var v : variables) {
         // Overwrite failures if we recover
         var result = success(expiring(domains.get(v).lowerBound.data(), solutionExpiry));
         v.resource.emit($ -> result);
-        System.out.printf("DEBUG: %s - Solved %s = %s%n", Resources.currentTime(), v, result);
       }
     } catch (Exception e) {
       // Solving failed, so populate all outputs with the failure.
@@ -213,7 +198,7 @@ public final class LinearArcConsistencySolver {
   public enum Comparison {
     LessThanOrEquals,
     GreaterThanOrEquals,
-    Equals;
+    Equals
   }
   public enum InequalityComparison {
     LessThanOrEquals,
@@ -226,12 +211,10 @@ public final class LinearArcConsistencySolver {
       };
     }
   }
-
-  public record VariableDerivative(Variable variable, int derivativeOrder) {}
   /**
    * Expression drivenTerm + sum of c_i * s_i over entries c_i -> s_i in controlledTerm
    */
-  public record LinearExpression(Resource<Polynomial> drivenTerm, Map<VariableDerivative, Double> controlledTerm) {
+  public record LinearExpression(Resource<Polynomial> drivenTerm, Map<Variable, Double> controlledTerm) {
     public static LinearExpression lx(double value) {
       return lx(constant(value));
     }
@@ -239,7 +222,7 @@ public final class LinearArcConsistencySolver {
       return new LinearExpression(drivenTerm, Map.of());
     }
     public static LinearExpression lx(Variable controlledTerm) {
-      return new LinearExpression(constant(0), Map.of(new VariableDerivative(controlledTerm, 0), 1.0));
+      return new LinearExpression(constant(0), Map.of(controlledTerm, 1.0));
     }
     public LinearExpression add(LinearExpression other) {
       return new LinearExpression(
@@ -259,38 +242,8 @@ public final class LinearArcConsistencySolver {
             scaleControlledTerm(controlledTerm, scale));
       }
     }
-    public LinearExpression derivative() {
-      return new LinearExpression(
-          PolynomialResources.differentiate(drivenTerm),
-          differentiateControlledTerm(controlledTerm, 1));
-    }
 
-    /**
-     * Integral of this expression.
-     * Undoes derivative exactly for variables,
-     * but assumes a starting value of 0 otherwise.
-     *
-     * @see LinearExpression#integral(Resource)
-     */
-    public LinearExpression integral() {
-      return new LinearExpression(
-          PolynomialResources.integrate(drivenTerm, 0),
-          differentiateControlledTerm(controlledTerm, -1));
-    }
-
-    /**
-     * Convenience constructor that takes the resource representing this integral.
-     * Extracts the current value of this resource to maintain continuity of the integral
-     * across multiple solver iterations.
-     */
-    public LinearExpression integral(Resource<Polynomial> integralValue) {
-      // To allow the solver to re-solve for integral dynamics, erase higher-order coefficients and expiry info.
-      return this.integral().add(lx(
-          () -> integralValue.getDynamics().map(
-              e -> neverExpiring(polynomial(e.data().extract())))));
-    }
-
-    private Map<VariableDerivative, Double> scaleControlledTerm(Map<VariableDerivative, Double> controlledTerm, double scale) {
+    private Map<Variable, Double> scaleControlledTerm(Map<Variable, Double> controlledTerm, double scale) {
       var result = new HashMap<>(controlledTerm);
       for (var v : result.keySet()) {
         result.computeIfPresent(v, (v$, s) -> s * scale);
@@ -298,8 +251,8 @@ public final class LinearArcConsistencySolver {
       return result;
     }
 
-    private static Map<VariableDerivative, Double> addControlledTerms(Map<VariableDerivative, Double> left, Map<VariableDerivative, Double> right) {
-      var result = new HashMap<VariableDerivative, Double>();
+    private static Map<Variable, Double> addControlledTerms(Map<Variable, Double> left, Map<Variable, Double> right) {
+      var result = new HashMap<Variable, Double>();
       var allVariables = new HashSet<>(left.keySet());
       allVariables.addAll(right.keySet());
       for (var v : allVariables) {
@@ -310,15 +263,6 @@ public final class LinearArcConsistencySolver {
       }
       return result;
     }
-
-    private static Map<VariableDerivative, Double> differentiateControlledTerm(Map<VariableDerivative, Double> controlledTerm, int order) {
-      var result = new HashMap<VariableDerivative, Double>();
-      for (var entry : controlledTerm.entrySet()) {
-        var v = entry.getKey();
-        result.put(new VariableDerivative(v.variable, v.derivativeOrder + order), entry.getValue());
-      }
-      return result;
-    }
   }
 
   // The following three kinds of constraints are equivalent, but are best suited to different use cases.
@@ -326,7 +270,7 @@ public final class LinearArcConsistencySolver {
   public record GeneralConstraint(LinearExpression left, Comparison comparison, LinearExpression right) {
     NormalizedConstraint normalize() {
       var drivenTerm = subtract(right.drivenTerm, left.drivenTerm);
-      var controlledTerm = new HashMap<VariableDerivative, Double>();
+      var controlledTerm = new HashMap<Variable, Double>();
       var allVariables = new HashSet<>(left.controlledTerm().keySet());
       allVariables.addAll(right.controlledTerm().keySet());
       for (var v : allVariables) {
@@ -344,20 +288,20 @@ public final class LinearArcConsistencySolver {
   }
   // Normalized is like General without redundant information. Also, drivenTerm can be used to trigger solving.
   private record NormalizedConstraint(
-      Map<VariableDerivative, Double> controlledTerm,
+      Map<Variable, Double> controlledTerm,
       Comparison comparison,
       Resource<Polynomial> drivenTerm) {
     List<DirectionalConstraint> standardize() {
       return controlledTerm.keySet().stream().flatMap(this::directionalConstraints).toList();
     }
-    private Stream<DirectionalConstraint> directionalConstraints(VariableDerivative constrainedVariable) {
+    private Stream<DirectionalConstraint> directionalConstraints(Variable constrainedVariable) {
       double inverseScale = 1 / controlledTerm.get(constrainedVariable);
       var drivingVariables = new HashSet<>(controlledTerm.keySet());
       drivingVariables.remove(constrainedVariable);
       Stream<InequalityComparison> inequalityComparisons = switch (comparison) {
-        case LessThanOrEquals -> Stream.of(InequalityComparison.LessThanOrEquals);
+        case LessThanOrEquals -> Stream.of(LessThanOrEquals);
         case GreaterThanOrEquals -> Stream.of(GreaterThanOrEquals);
-        case Equals -> Stream.of(InequalityComparison.LessThanOrEquals, GreaterThanOrEquals);
+        case Equals -> Stream.of(LessThanOrEquals, GreaterThanOrEquals);
       };
       return inequalityComparisons.map(c -> new DirectionalConstraint(constrainedVariable, inverseScale > 0 ? c : c.opposite(), domains -> {
         // Expiry for driven terms is captured by re-solving rather than expiring the solution.
@@ -366,7 +310,7 @@ public final class LinearArcConsistencySolver {
         var result = eraseExpiry(drivenTerm);
         for (var drivingVariable : drivingVariables) {
           var scale = controlledTerm.get(drivingVariable);
-          var domain = domains.get(drivingVariable.variable).derivativeDomain(drivingVariable.derivativeOrder);
+          var domain = domains.get(drivingVariable);
           var useLowerBound = (scale > 0) == (c == LessThanOrEquals);
           var domainBound = ExpiringMonad.map(
               useLowerBound ? domain.lowerBound() : domain.upperBound(),
@@ -374,7 +318,7 @@ public final class LinearArcConsistencySolver {
           result = add(result, () -> success(domainBound));
         }
         return multiply(result, constant(inverseScale));
-      }, drivingVariables.stream().map(VariableDerivative::variable).collect(Collectors.toSet())));
+      }, drivingVariables));
     }
     private static <D> Resource<D> eraseExpiry(Resource<D> p) {
       return () -> p.getDynamics().map(e -> neverExpiring(e.data()));
@@ -382,144 +326,62 @@ public final class LinearArcConsistencySolver {
   }
   // Directional constraints are useful for arc consistency, since they have input (driving) and output (constrained) variables.
   // However, many directional constraints are required in general to express one General constraint.
-  private record DirectionalConstraint(VariableDerivative constrainedVariable, InequalityComparison comparison, Function<Map<Variable, ? extends Domain>, Resource<Polynomial>> bound, Set<Variable> drivingVariables) {}
+  private record DirectionalConstraint(Variable constrainedVariable, InequalityComparison comparison, Function<Map<Variable, ? extends Domain>, Resource<Polynomial>> bound, Set<Variable> drivingVariables) {}
 
-  public interface Domain {
-    Expiring<Polynomial> lowerBound();
-    Expiring<Polynomial> upperBound();
-    boolean restrictLower(Expiring<Polynomial> newLowerBound);
-    boolean restrictUpper(Expiring<Polynomial> newUpperBound);
-    default Domain derivativeDomain(int order) {
-      Domain result = this;
-      // while (order-- > 0) result = result.derivative();
-      for (; order > 0; --order) result = result.derivative();
-      for (; order < 0; ++order) result = result.integral();
-      return result;
-    }
-    default Domain derivative() {
-      return new Domain() {
-        @Override
-        public Expiring<Polynomial> lowerBound() {
-          return valueClamped()
-              ? ExpiringMonad.map(Domain.this.lowerBound(), Polynomial::derivative)
-              : neverExpiring(polynomial(Double.NEGATIVE_INFINITY));
-        }
-
-        @Override
-        public Expiring<Polynomial> upperBound() {
-          return valueClamped()
-              ? ExpiringMonad.map(Domain.this.upperBound(), Polynomial::derivative)
-              : neverExpiring(polynomial(Double.POSITIVE_INFINITY));
-        }
-
-        @Override
-        public boolean restrictLower(final Expiring<Polynomial> newLowerBound) {
-          // If value is unclamped, restricting the derivative means nothing.
-          return valueClamped() && Domain.this.restrictLower(
-              ExpiringMonad.map(newLowerBound, lb -> lb.integral(Domain.this.lowerBound().data().extract())));
-        }
-
-        @Override
-        public boolean restrictUpper(final Expiring<Polynomial> newUpperBound) {
-          // If value is unclamped, restricting the derivative means nothing.
-          return valueClamped() && Domain.this.restrictUpper(
-              ExpiringMonad.map(newUpperBound, lb -> lb.integral(Domain.this.upperBound().data().extract())));
-        }
-
-        private boolean valueClamped() {
-          return Objects.equals(
-              Domain.this.lowerBound().data().extract(),
-              Domain.this.upperBound().data().extract());
-        }
-      };
-    }
-    default Domain integral() {
-      return new Domain() {
-        @Override
-        public Expiring<Polynomial> lowerBound() {
-          return ExpiringMonad.map(Domain.this.lowerBound(), p -> p.integral(0));
-        }
-
-        @Override
-        public Expiring<Polynomial> upperBound() {
-          return ExpiringMonad.map(Domain.this.upperBound(), p -> p.integral(0));
-        }
-
-        @Override
-        public boolean restrictLower(final Expiring<Polynomial> newLowerBound) {
-          if (newLowerBound.data().extract() > 0) {
-            // This domain has value 0, so now it should be empty.
-            return Domain.this.restrictLower(neverExpiring(polynomial(Double.POSITIVE_INFINITY)));
-          } else if (newLowerBound.data().extract() == 0) {
-            // Nominal case
-            return Domain.this.restrictLower(ExpiringMonad.map(newLowerBound, Polynomial::derivative));
-          } else {
-            // integral value is 0, so dominates any negative-value lower bound.
-            return false;
-          }
-        }
-
-        @Override
-        public boolean restrictUpper(final Expiring<Polynomial> newUpperBound) {
-          if (newUpperBound.data().extract() < 0) {
-            // This domain has value 0, so now it should be empty.
-            return Domain.this.restrictUpper(neverExpiring(polynomial(Double.NEGATIVE_INFINITY)));
-          } else if (newUpperBound.data().extract() == 0) {
-            // Nominal case
-            return Domain.this.restrictUpper(ExpiringMonad.map(newUpperBound, Polynomial::derivative));
-          } else {
-            // integral value is 0, so dominates any negative-value lower bound.
-            return false;
-          }
-        }
-      };
-    }
-    default boolean isEmpty() {
-      return lowerBound().data().extract() > upperBound().data().extract();
-    }
-    default boolean isUnsolved() {
-      return !lowerBound().data().equals(upperBound().data());
-    }
-  }
-
-  public static final class VariableDomain implements Domain {
+  public static final class Domain {
     public final Variable variable;
     private Expiring<Polynomial> lowerBound;
     private Expiring<Polynomial> upperBound;
 
-    public VariableDomain(Variable variable) {
+    public Domain(Variable variable) {
       this.variable = variable;
       this.lowerBound = neverExpiring(polynomial(Double.NEGATIVE_INFINITY));
       this.upperBound = neverExpiring(polynomial(Double.POSITIVE_INFINITY));
     }
 
-    @Override
     public Expiring<Polynomial> lowerBound() {
       return lowerBound;
     }
 
-    @Override
     public Expiring<Polynomial> upperBound() {
       return upperBound;
     }
 
-    @Override
     public boolean restrictLower(Expiring<Polynomial> newLowerBound) {
       var oldLowerBound = lowerBound;
-      lowerBound = bind(lowerBound, ub -> bind(newLowerBound, ub::max));
+      lowerBound = bind(lowerBound, lb -> bind(newLowerBound, nlb -> lb.max(turnNanInto(nlb, Double.NEGATIVE_INFINITY))));
       return !lowerBound.equals(oldLowerBound);
     }
 
-    @Override
     public boolean restrictUpper(Expiring<Polynomial> newUpperBound) {
       var oldUpperBound = upperBound;
-      upperBound = bind(upperBound, ub -> bind(newUpperBound, ub::min));
+      upperBound = bind(upperBound, ub -> bind(newUpperBound, nub -> ub.min(turnNanInto(nub, Double.POSITIVE_INFINITY))));
       return !upperBound.equals(oldUpperBound);
+    }
+
+    private static Polynomial turnNanInto(Polynomial p, double replacement) {
+      // NaN indicates a lack of information. This can be used to re-interpret it as needed, depending on context.
+      for (int n = 0; n <= p.degree(); ++n) {
+        if (Double.isNaN(p.getCoefficient(n))) {
+          var newCoefficients = Arrays.copyOf(p.coefficients(), n + 1);
+          newCoefficients[n] = replacement;
+          return polynomial(newCoefficients);
+        }
+      }
+      return p;
     }
 
     @Override
     public String toString() {
       return "Domain[" + lowerBound + ", " + upperBound + ']';
+    }
+
+    public boolean isEmpty() {
+      return lowerBound().data().extract() > upperBound().data().extract();
+    }
+
+    public boolean isUnsolved() {
+      return !lowerBound().data().equals(upperBound().data());
     }
   }
 }
