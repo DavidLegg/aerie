@@ -5,13 +5,13 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import java.util.function.Function;
 
 public sealed interface ErrorCatching<T> {
-  <R> R match(Function<T, R> onSuccess, Function<Exception, R> onError);
+  <R> R match(Function<T, R> onSuccess, Function<Throwable, R> onError);
 
   static <T> ErrorCatching<T> success(T result) {
     return new Success<>(result);
   }
 
-  static <T> ErrorCatching<T> failure(Exception exception) {
+  static <T> ErrorCatching<T> failure(Throwable exception) {
     return new Failure<>(exception);
   }
 
@@ -29,14 +29,14 @@ public sealed interface ErrorCatching<T> {
 
   record Success<T>(T result) implements ErrorCatching<T> {
     @Override
-    public <R> R match(final Function<T, R> onSuccess, final Function<Exception, R> onError) {
+    public <R> R match(final Function<T, R> onSuccess, final Function<Throwable, R> onError) {
       return onSuccess.apply(result);
     }
   }
 
-  record Failure<T>(Exception exception) implements ErrorCatching<T> {
+  record Failure<T>(Throwable exception) implements ErrorCatching<T> {
     @Override
-    public <R> R match(final Function<T, R> onSuccess, final Function<Exception, R> onError) {
+    public <R> R match(final Function<T, R> onSuccess, final Function<Throwable, R> onError) {
       return onError.apply(exception);
     }
   }
