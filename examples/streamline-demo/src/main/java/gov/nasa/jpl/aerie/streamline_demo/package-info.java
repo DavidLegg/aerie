@@ -5,6 +5,7 @@
 @WithMappers(BasicValueMappers.class)
 
 @WithActivityType(ChangeDesiredRate.class)
+@WithActivityType(CauseError.class)
 
 package gov.nasa.jpl.aerie.streamline_demo;
 

@@ -9,8 +9,11 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.util.List;
 import java.util.function.BinaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.labelled;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -35,8 +38,11 @@ public final class CellRefV2 {
 
       @Override
       public void apply(Cell<D> cell, Labelled<E> effect) {
-        // TODO: Should we catch errors and annotate them with label information?
-        cell.initialDynamics = effect.data().apply(cell.dynamics);
+        cell.initialDynamics = effect.data().apply(cell.dynamics).match(
+            ErrorCatching::success,
+            error -> failure(new RuntimeException(
+                "Applying effect %s failed. Effect context:%n%s".formatted(effect.name(), formatContext(effect.context())),
+                error)));
         cell.dynamics = cell.initialDynamics;
         cell.elapsedTime = ZERO;
       }
@@ -49,15 +55,15 @@ public final class CellRefV2 {
         cell.dynamics = ErrorCatchingMonad.map(cell.initialDynamics, d ->
             expiring(d.data().step(cell.elapsedTime), d.expiry().minus(cell.elapsedTime)));
       }
-// DEBUG: Trying this without exposing expiry info to Aerie.
-// We always update cells ourselves, and our notion of expiry clashes a little with Aerie's on some edge-cases.
-//      @Override
-//      public Optional<Duration> getExpiry(Cell<D> cell) {
-//        return cell.dynamics.match(
-//            expiring -> expiring.expiry().value(),
-//            exception -> Optional.empty());
-//      }
     });
+  }
+
+  private static String formatContext(Context context) {
+    return "  " + Stream.concat(
+        Stream.of(context.name()),
+        context.parentContexts().stream().map(CellRefV2::formatContext))
+                 .collect(Collectors.joining("\n"))
+                 .replace("\n", "\n  ");
   }
 
   public static <D extends Dynamics<?, D>> EffectTrait<Labelled<DynamicsEffect<D>>> noncommutingEffects() {

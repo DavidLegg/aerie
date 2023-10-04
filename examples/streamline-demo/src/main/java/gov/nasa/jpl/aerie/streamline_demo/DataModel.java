@@ -119,7 +119,7 @@ public class DataModel {
     registrar.clearTrace();
   }
 
-  private static Resource<Linear> linearize(Resource<Polynomial> p) {
+  static Resource<Linear> linearize(Resource<Polynomial> p) {
     return map(p, p$ -> {
       if (p$.degree() <= 1) {
         return linear(p$.getCoefficient(0), p$.getCoefficient(1));

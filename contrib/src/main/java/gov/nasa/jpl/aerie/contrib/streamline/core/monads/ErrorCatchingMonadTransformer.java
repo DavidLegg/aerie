@@ -32,7 +32,7 @@ public final class ErrorCatchingMonadTransformer {
         a -> {
           try {
             return f.apply(a);
-          } catch (Exception e) {
+          } catch (Throwable e) {
             return mUnit.apply(failure(e));
           }
         },
