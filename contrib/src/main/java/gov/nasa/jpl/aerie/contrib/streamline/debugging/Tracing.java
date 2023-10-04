@@ -5,6 +5,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Labelled;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
@@ -71,11 +72,11 @@ public final class Tracing {
   }
 
   public static <D extends Dynamics<?, D>> CellResource<D> traceFull(String name, Consumer<ErrorCatching<Expiring<D>>> assertion, CellResource<D> resource) {
-    return new CellResource<D>() {
+    return new CellResource<>() {
       private final Resource<D> tracedResource = traceFull(name, assertion, resource);
 
       @Override
-      public void emit(final DynamicsEffect<D> effect) {
+      public void emit(final Labelled<DynamicsEffect<D>> effect) {
         resource.emit(effect);
       }
 
