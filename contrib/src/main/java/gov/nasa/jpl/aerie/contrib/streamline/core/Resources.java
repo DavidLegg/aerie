@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.staticallyCreated;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.inContext;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
@@ -33,19 +35,12 @@ public final class Resources {
   // TODO: Consider adding this somewhere in the Registrar class, since that'll be used during initialization.
   public static void init() {
     currentTime();
+    Labelled.init();
   }
 
-  private static CellResource<ClockDynamics> CLOCK = cellResource(new ClockDynamics(ZERO));
+  private static final CellResource<ClockDynamics> CLOCK = staticallyCreated(() -> cellResource(new ClockDynamics(ZERO)));
   public static Duration currentTime() {
-    try {
-      return currentValue(CLOCK);
-    } catch (EmptyDynamicCellException | IllegalArgumentException e) {
-      // If we're running unit tests, several simulations can happen without reloading the Resources class.
-      // In that case, we'll have discarded the clock resource we were using, and get the above exception.
-      // REVIEW: Is there a cleaner way to make sure this resource gets (re-)initialized?
-      CLOCK = cellResource(new ClockDynamics(ZERO));
-      return currentValue(CLOCK);
-    }
+    return currentValue(CLOCK);
   }
 
   public static <D> D currentData(Resource<D> resource) {
