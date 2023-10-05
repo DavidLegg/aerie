@@ -12,7 +12,12 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.merlin.framework.ValueMapper;
 import gov.nasa.jpl.aerie.merlin.protocol.types.RealDynamics;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +39,7 @@ import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.waitUntil;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 public class Registrar {
   private final gov.nasa.jpl.aerie.merlin.framework.Registrar baseRegistrar;
@@ -56,9 +62,7 @@ public class Registrar {
   }
 
   private static String formatException(Throwable e) {
-    return "%s: %s".formatted(
-        e.getClass().getSimpleName(),
-        e.getMessage()) + (e.getCause() == null ? "" : "\nCaused by: " + formatException(e.getCause()));
+    return ExceptionUtils.getStackTrace(e);
   }
 
   public void setTrace() {

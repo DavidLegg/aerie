@@ -1,8 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
-import gov.nasa.jpl.aerie.merlin.framework.Scoped.EmptyDynamicCellException;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
@@ -11,8 +9,6 @@ import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.staticallyCreated;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.inContext;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -32,10 +28,8 @@ public final class Resources {
    *   This method is idempotent; calling it multiple times is the same as calling it once.
    * </p>
    */
-  // TODO: Consider adding this somewhere in the Registrar class, since that'll be used during initialization.
   public static void init() {
     currentTime();
-    Labelled.init();
   }
 
   private static final CellResource<ClockDynamics> CLOCK = staticallyCreated(() -> cellResource(new ClockDynamics(ZERO)));

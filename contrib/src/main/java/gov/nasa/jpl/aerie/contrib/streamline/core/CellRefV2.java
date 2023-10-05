@@ -1,6 +1,5 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.Context;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.merlin.protocol.model.CellType;
@@ -13,7 +12,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.labelled;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -40,9 +38,17 @@ public final class CellRefV2 {
       public void apply(Cell<D> cell, Labelled<E> effect) {
         cell.initialDynamics = effect.data().apply(cell.dynamics).match(
             ErrorCatching::success,
-            error -> failure(new RuntimeException(
-                "Applying effect %s failed. Effect context:%n%s".formatted(effect.name(), formatContext(effect.context())),
-                error)));
+            error -> {
+              // Roll up all the stack traces
+              for (int i = effect.context().size() - 1; i > 0; --i) {
+                error = new RuntimeException("Additional effect context", error);
+                error.setStackTrace(effect.context().get(i));
+              }
+              error = new RuntimeException(
+                  "Applying effect %s failed.".formatted(effect.name()), error);
+              error.setStackTrace(effect.context().get(0));
+              return failure(error);
+            });
         cell.dynamics = cell.initialDynamics;
         cell.elapsedTime = ZERO;
       }
@@ -56,14 +62,6 @@ public final class CellRefV2 {
             expiring(d.data().step(cell.elapsedTime), d.expiry().minus(cell.elapsedTime)));
       }
     });
-  }
-
-  private static String formatContext(Context context) {
-    return "  " + Stream.concat(
-        Stream.of(context.name()),
-        context.parentContexts().stream().map(CellRefV2::formatContext))
-                 .collect(Collectors.joining("\n"))
-                 .replace("\n", "\n  ");
   }
 
   public static <D extends Dynamics<?, D>> EffectTrait<Labelled<DynamicsEffect<D>>> noncommutingEffects() {
@@ -102,12 +100,16 @@ public final class CellRefV2 {
         return new Labelled<>(
             x -> suffix.data().apply(prefix.data().apply(x)),
             "(%s) then (%s)".formatted(prefix.name(), suffix.name()),
-            new Context("Combining Sequential Effects", List.of(prefix.context(), suffix.context())));
+            Stream.concat(
+                prefix.context().stream(),
+                suffix.context().stream()).toList());
       }
 
       @Override
       public Labelled<DynamicsEffect<D>> concurrently(final Labelled<DynamicsEffect<D>> left, final Labelled<DynamicsEffect<D>> right) {
-        var context = new Context("Combining Concurrent Effects", List.of(left.context(), right.context()));
+        var context = Stream.concat(
+            left.context().stream(),
+            right.context().stream()).toList();
         try {
           final DynamicsEffect<D> combined = combineConcurrent.apply(left.data(), right.data());
           return new Labelled<>(

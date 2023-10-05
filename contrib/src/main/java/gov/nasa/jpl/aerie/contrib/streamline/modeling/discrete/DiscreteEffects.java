@@ -11,7 +11,7 @@ public final class DiscreteEffects {
   // More convenient overload of "set" when using discrete dynamics
 
   public static <A> void set(CellResource<Discrete<A>> resource, A newValue) {
-    resource.emit(effect(x -> newValue));
+    resource.emit("Set " + newValue, effect(x -> newValue));
   }
 
   // Flag/Switch style operations
