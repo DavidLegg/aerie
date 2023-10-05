@@ -50,7 +50,7 @@ public class Registrar {
     Resources.init();
     this.baseRegistrar = baseRegistrar;
     errors = cellResource(Discrete.discrete(Map.of()));
-    var errorString = map(errors, errors$ -> errors$.entrySet().stream().map(entry -> formatError(entry.getKey(), entry.getValue())).collect(joining("\n")));
+    var errorString = map(errors, errors$ -> errors$.entrySet().stream().map(entry -> formatError(entry.getKey(), entry.getValue())).collect(joining("\n\n")));
     discrete("errors", errorString, new StringValueMapper());
     discrete("numberOfErrors", map(errors, Map::size), new IntegerValueMapper());
   }
@@ -62,7 +62,9 @@ public class Registrar {
   }
 
   private static String formatException(Throwable e) {
-    return ExceptionUtils.getStackTrace(e);
+    return ExceptionUtils.stream(e)
+        .map(ExceptionUtils::getMessage)
+        .collect(joining("\nCaused by: "));
   }
 
   public void setTrace() {
@@ -74,6 +76,7 @@ public class Registrar {
   }
 
   public <Value> void discrete(final String name, final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {
+    resource.registerName(name);
     var registeredResource = trace ? trace(name, resource) : resource;
     baseRegistrar.discrete(
         name,
@@ -83,6 +86,7 @@ public class Registrar {
   }
 
   public void real(final String name, final Resource<Linear> resource) {
+    resource.registerName(name);
     var registeredResource = trace ? trace(name, resource) : resource;
     baseRegistrar.real(name, () -> registeredResource.getDynamics().match(
         v -> RealDynamics.linear(v.data().extract(), v.data().rate()),
@@ -91,10 +95,12 @@ public class Registrar {
   }
 
   public void assertion(final String message, final Resource<Discrete<Boolean>> assertion) {
+    assertion.registerName(message);
     // Log an error when the assertion fails, i.e., on true -> false edges.
     whenever(not(assertion), () -> {
       var e = new AssertionError(message);
-      logError(null, e);
+      // TODO: Should assertions have a name, separate from their message?
+      logError(message, e);
       // Use a new task to capture the reference to e.
       // Without this, we replay and create a new object, so we can't remove the original.
       call(replaying(() -> {
@@ -105,7 +111,7 @@ public class Registrar {
   }
 
   private <D extends Dynamics<?, D>> void logErrors(String name, Resource<D> resource) {
-    wheneverDynamicsChange(resource, ec -> ec.match($ -> null, e -> logError(name, e)));
+     wheneverDynamicsChange(resource, ec -> ec.match($ -> null, e -> logError(name, e)));
   }
 
   // TODO: Consider pulling in a Guava MultiMap instead of doing this by hand below

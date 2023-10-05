@@ -33,13 +33,17 @@ public final class UnitAwareResources {
         cellResource.emit(new Labelled<>(
             unscaledDynamics -> extendedScaling.apply(effect.data().apply(
                 extendedScaling.apply(unscaledDynamics, scale)), 1 / scale),
-            effect.name(),
-            effect.context()));
+            effect.name()));
       }
 
       @Override
       public ErrorCatching<Expiring<D>> getDynamics() {
         return extendedScaling.apply(cellResource.getDynamics(), scale);
+      }
+
+      @Override
+      public void registerName(final String name) {
+        resource.registerName(name);
       }
     });
   }

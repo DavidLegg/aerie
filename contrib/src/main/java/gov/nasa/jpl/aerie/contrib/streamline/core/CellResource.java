@@ -8,6 +8,10 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.merlin.framework.Scoped;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
@@ -19,22 +23,7 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Unit.UNIT;
 /**
  * Resource which is backed directly by a cell.
  * Effects can be applied to this resource.
- * By default, effects are labelled with the ambient context
- * at the time the effect is emitted.
- *
- * <p>
- *   A typical use case would be to emit an effect from an activity, e.g.
- *   <pre>
- * class ActivityA {
- *   void run() {
- *     {@link Labelled#inContext}("ActivityA", () -> {
- *       {@link CellResource#set}(someResource, newDynamics);
- *       anotherResource.emit("Take the square root", {@link DiscreteDynamicsMonad#effect}(n -> sqrt(n)));
- *     });
- *   }
- * }
- *   </pre>
- * </p>
+ * Effect names are augmented with this resource's name(s).
  */
 public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
   void emit(Labelled<DynamicsEffect<D>> effect);
@@ -63,15 +52,29 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
       // have relatively few effects, and even fewer concurrent effects, so this is performant enough.
       // If that doesn't hold, a more specialized solution can be constructed directly.
       private final CellRef<Labelled<DynamicsEffect<D>>, Cell<D>> cell = allocate(initial, effectTrait);
+      private final List<String> names = new LinkedList<>();
 
       @Override
       public void emit(final Labelled<DynamicsEffect<D>> effect) {
-        cell.emit(effect);
+        cell.emit(labelled(augmentEffectName(effect.name()), effect.data()));
       }
 
       @Override
       public ErrorCatching<Expiring<D>> getDynamics() {
         return cell.get().dynamics;
+      }
+
+      @Override
+      public void registerName(final String name) {
+        names.add(name);
+      }
+
+      private String augmentEffectName(String effectName) {
+        return effectName + " on " + switch (names.size()) {
+          case 0 -> "anonymous resource";
+          case 1 -> names.get(0);
+          default -> names.get(0) + " (aka. %s)".formatted(String.join(", ", names.subList(1, names.size())));
+        };
       }
     };
   }
@@ -90,6 +93,11 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
         // Keep the field access using () -> ... form, don't simplify to delegate::getDynamics
         // Simplifying will access delegate before calling actOnCell, failing if we need to re-allocate delegate.
         return actOnCell(() -> delegate.getDynamics());
+      }
+
+      @Override
+      public void registerName(final String name) {
+        delegate.registerName(name);
       }
 
       private void actOnCell(Runnable action) {

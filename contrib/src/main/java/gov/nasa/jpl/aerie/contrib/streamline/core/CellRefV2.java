@@ -38,17 +38,8 @@ public final class CellRefV2 {
       public void apply(Cell<D> cell, Labelled<E> effect) {
         cell.initialDynamics = effect.data().apply(cell.dynamics).match(
             ErrorCatching::success,
-            error -> {
-              // Roll up all the stack traces
-              for (int i = effect.context().size() - 1; i > 0; --i) {
-                error = new RuntimeException("Additional effect context", error);
-                error.setStackTrace(effect.context().get(i));
-              }
-              error = new RuntimeException(
-                  "Applying effect %s failed.".formatted(effect.name()), error);
-              error.setStackTrace(effect.context().get(0));
-              return failure(error);
-            });
+            error -> failure(new RuntimeException(
+                "Applying '%s' failed.".formatted(effect.name()), error)));
         cell.dynamics = cell.initialDynamics;
         cell.elapsedTime = ZERO;
       }
@@ -99,17 +90,11 @@ public final class CellRefV2 {
       public Labelled<DynamicsEffect<D>> sequentially(final Labelled<DynamicsEffect<D>> prefix, final Labelled<DynamicsEffect<D>> suffix) {
         return new Labelled<>(
             x -> suffix.data().apply(prefix.data().apply(x)),
-            "(%s) then (%s)".formatted(prefix.name(), suffix.name()),
-            Stream.concat(
-                prefix.context().stream(),
-                suffix.context().stream()).toList());
+            "(%s) then (%s)".formatted(prefix.name(), suffix.name()));
       }
 
       @Override
       public Labelled<DynamicsEffect<D>> concurrently(final Labelled<DynamicsEffect<D>> left, final Labelled<DynamicsEffect<D>> right) {
-        var context = Stream.concat(
-            left.context().stream(),
-            right.context().stream()).toList();
         try {
           final DynamicsEffect<D> combined = combineConcurrent.apply(left.data(), right.data());
           return new Labelled<>(
@@ -120,13 +105,11 @@ public final class CellRefV2 {
                   return failure(e);
                 }
               },
-              "(%s) and (%s)".formatted(left.name(), right.name()),
-              context);
+              "(%s) and (%s)".formatted(left.name(), right.name()));
         } catch (Throwable e) {
           return new Labelled<>(
               $ -> failure(e),
-              "Failed to combine concurrent effects: (%s) and (%s)".formatted(left.name(), right.name()),
-              context);
+              "Failed to combine concurrent effects: (%s) and (%s)".formatted(left.name(), right.name()));
         }
       }
     };

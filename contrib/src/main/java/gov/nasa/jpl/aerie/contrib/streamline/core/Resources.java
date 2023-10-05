@@ -56,7 +56,9 @@ public final class Resources {
               ignored -> true),
           startException -> currentDynamics.match(
               ignored -> true,
-              currentException -> !startException.equals(currentException)));
+              // Use semantic comparison for exceptions, since derivation can generate the exception each invocation.
+              currentException -> !(startException.getClass().equals(currentException.getClass())
+                                    && startException.getMessage().equals(currentException.getMessage()))));
 
       return positive == haveChanged
           ? Optional.of(atEarliest)

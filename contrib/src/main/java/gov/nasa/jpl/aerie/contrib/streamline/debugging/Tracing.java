@@ -73,7 +73,7 @@ public final class Tracing {
 
   public static <D extends Dynamics<?, D>> CellResource<D> traceFull(String name, Consumer<ErrorCatching<Expiring<D>>> assertion, CellResource<D> resource) {
     return new CellResource<>() {
-      private final Resource<D> tracedResource = traceFull(name, assertion, resource);
+      private final Resource<D> tracedResource = traceFull(name, assertion, (Resource<D>)resource);
 
       @Override
       public void emit(final Labelled<DynamicsEffect<D>> effect) {
@@ -83,6 +83,11 @@ public final class Tracing {
       @Override
       public ErrorCatching<Expiring<D>> getDynamics() {
         return tracedResource.getDynamics();
+      }
+
+      @Override
+      public void registerName(final String name) {
+        resource.registerName(name);
       }
     };
   }

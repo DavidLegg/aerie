@@ -1,14 +1,13 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
  * Attaches name and context to a datum.
  */
-public record Labelled<V>(V data, String name, List<StackTraceElement[]> context) {
+public record Labelled<V>(V data, String name) {
   public static <V> Labelled<V> labelled(String name, V data) {
-    return new Labelled<>(data, name, List.<StackTraceElement[]>of(Thread.currentThread().getStackTrace()));
+    return new Labelled<>(data, name);
   }
 
   @Override
