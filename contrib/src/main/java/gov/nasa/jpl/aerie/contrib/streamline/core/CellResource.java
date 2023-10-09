@@ -2,16 +2,14 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Context;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.merlin.framework.Scoped;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
@@ -19,6 +17,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Labelled.labelled;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.unit;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Unit.UNIT;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Resource which is backed directly by a cell.
@@ -70,11 +69,12 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
       }
 
       private String augmentEffectName(String effectName) {
-        return effectName + " on " + switch (names.size()) {
+        var resourceName = switch (names.size()) {
           case 0 -> "anonymous resource";
           case 1 -> names.get(0);
           default -> names.get(0) + " (aka. %s)".formatted(String.join(", ", names.subList(1, names.size())));
         };
+        return effectName + " on " + resourceName + Context.get().stream().map(c -> " during " + c).collect(joining());
       }
     };
   }
