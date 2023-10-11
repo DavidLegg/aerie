@@ -9,7 +9,7 @@ public record Clock(Duration extract) implements Dynamics<Duration, Clock> {
     return clock(extract().plus(t));
   }
 
-  static Clock clock(Duration startingTime) {
+  public static Clock clock(Duration startingTime) {
     return new Clock(startingTime);
   }
 }

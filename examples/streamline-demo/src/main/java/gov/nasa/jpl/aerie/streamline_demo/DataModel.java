@@ -1,8 +1,8 @@
 package gov.nasa.jpl.aerie.streamline_demo;
 
+import gov.nasa.jpl.aerie.contrib.serialization.mappers.BooleanValueMapper;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver;
@@ -12,8 +12,8 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.assertThat;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear.linear;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.LinearExpression.lx;
@@ -114,8 +114,12 @@ public class DataModel {
     registrar.real("volumeC", linearize(volumeC));
     registrar.real("totalVolume", linearize(totalVolume));
     registrar.real("maxVolume", linearize(upperBoundOnTotalVolume));
-    registrar.assertion("Total volume must not exceed upper bound.",
-                        signalling(lessThanOrEquals(totalVolume, upperBoundOnTotalVolume)));
+    registrar.discrete(
+        "totalVolumeConstraint",
+        assertThat(
+            "Total volume must not exceed upper bound.",
+            lessThanOrEquals(totalVolume, upperBoundOnTotalVolume)),
+        new BooleanValueMapper());
     registrar.clearTrace();
   }
 

@@ -2,8 +2,6 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware;
 
 import java.util.Objects;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Rational.rational;
-
 public final class Unit {
   public final Dimension dimension;
   public final double multiplier;

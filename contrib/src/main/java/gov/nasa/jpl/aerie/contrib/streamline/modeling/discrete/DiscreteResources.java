@@ -3,7 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
@@ -18,7 +18,6 @@ import java.util.function.BiPredicate;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad.*;
 
 public final class DiscreteResources {
@@ -60,7 +59,7 @@ public final class DiscreteResources {
   }
 
   private static Discrete<Double> discreteScaling(Discrete<Double> d, Double scale) {
-    return map(d, $ -> $ * scale);
+    return DiscreteMonad.map(d, $ -> $ * scale);
   }
 
   // Boolean logic
@@ -76,6 +75,13 @@ public final class DiscreteResources {
   }
 
   public static Resource<Discrete<Boolean>> not(Resource<Discrete<Boolean>> operand) {
-    return DiscreteResourceMonad.map(operand, $ -> !$);
+    return map(operand, $ -> !$);
+  }
+
+  public static Resource<Discrete<Boolean>> assertThat(String description, Resource<Discrete<Boolean>> assertion) {
+    return map(assertion, a -> {
+      if (a) return true;
+      throw new AssertionError(description);
+    });
   }
 }

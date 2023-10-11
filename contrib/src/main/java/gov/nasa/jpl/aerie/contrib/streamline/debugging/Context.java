@@ -1,8 +1,13 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
+import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.function.Supplier;
+
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Unit.UNIT;
 
 /**
  * Thread-local scope-bound description of the current context.
@@ -12,15 +17,33 @@ public final class Context {
 
   private static final ThreadLocal<Deque<String>> contexts = ThreadLocal.withInitial(ArrayDeque::new);
 
+  /**
+   * @see Context#inContext(String, Supplier)
+   */
   public static void inContext(String contextName, Runnable action) {
+    inContext(contextName, asSupplier(action));
+  }
+
+  /**
+   * Run action in a globally-visible context.
+   * Contexts stack, and contexts are removed when control leaves action for any reason.
+   */
+  public static <R> R inContext(String contextName, Supplier<R> action) {
     // Using a thread-local context stack maintains isolation for threaded tasks.
     try {
       contexts.get().push(contextName);
-      action.run();
+      return action.get();
     } finally {
       // Doing the tear-down in a finally block maintains isolation for replaying tasks.
       contexts.get().pop();
     }
+  }
+
+  /**
+   * @see Context#inContext(List, Supplier)
+   */
+  public static void inContext(List<String> contextStack, Runnable action) {
+    inContext(contextStack, asSupplier(action));
   }
 
   /**
@@ -36,14 +59,21 @@ public final class Context {
    *
    * @see Context#contextualized
    */
-  public static void inContext(List<String> contextStack, Runnable action) {
+  public static <R> R inContext(List<String> contextStack, Supplier<R> action) {
     if (contextStack.isEmpty()) {
-      action.run();
+      return action.get();
     } else {
       int n = contextStack.size() - 1;
-      inContext(contextStack.get(n), () ->
+      return inContext(contextStack.get(n), () ->
           inContext(contextStack.subList(0, n), action));
     }
+  }
+
+  /**
+   * @see Context#contextualized(Supplier)
+   */
+  public static Runnable contextualized(Runnable action) {
+    return contextualized(asSupplier(action))::get;
   }
 
   /**
@@ -65,9 +95,16 @@ public final class Context {
    * @see Context#inContext(List, Runnable)
    * @see Context#inContext(String, Runnable)
    */
-  public static Runnable contextualized(Runnable action) {
+  public static <R> Supplier<R> contextualized(Supplier<R> action) {
     final var context = get();
     return () -> inContext(context, action);
+  }
+
+  /**
+   * @see Context#contextualized(String, Supplier)
+   */
+  public static Runnable contextualized(String childContext, Runnable action) {
+    return contextualized(childContext, asSupplier(action))::get;
   }
 
   /**
@@ -89,7 +126,7 @@ public final class Context {
    * @see Context#inContext(List, Runnable)
    * @see Context#inContext(String, Runnable)
    */
-  public static Runnable contextualized(String childContext, Runnable action) {
+  public static <R> Supplier<R> contextualized(String childContext, Supplier<R> action) {
     return contextualized(() -> inContext(childContext, action));
   }
 
@@ -98,5 +135,12 @@ public final class Context {
    */
   public static List<String> get() {
     return contexts.get().stream().toList();
+  }
+
+  private static Supplier<Unit> asSupplier(Runnable action) {
+    return () -> {
+      action.run();
+      return UNIT;
+    };
   }
 }

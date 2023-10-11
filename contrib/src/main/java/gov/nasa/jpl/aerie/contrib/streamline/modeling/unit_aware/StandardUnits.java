@@ -1,7 +1,5 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.unit_aware.Rational.rational;
-
 public final class StandardUnits {
   private StandardUnits() {}
 

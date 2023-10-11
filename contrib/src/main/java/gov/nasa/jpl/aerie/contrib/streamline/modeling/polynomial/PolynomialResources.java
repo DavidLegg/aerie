@@ -1,12 +1,8 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringToResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -20,8 +16,6 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import java.util.Arrays;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
@@ -86,59 +80,6 @@ public final class PolynomialResources {
         cell.emit(bindEffect(integral -> DynamicsMonad.map(integrandDynamics, integrand$ ->
             integrand$.integral(integral.extract())))));
     return cell;
-  }
-
-  public static Resource<Polynomial> clampedIntegrate(Resource<Polynomial> integrand, double startingValue, Resource<Polynomial> minimum, Resource<Polynomial> maximum) {
-    // Clamp the starting value so integral always starts out legal:
-    var clampedStartingValue = clamp(constant(startingValue), minimum, maximum);
-    // Bootstrap integral by initially using a constant "integral" resource:
-    var initialEffectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, clampedStartingValue);
-    // This way, the resource is initialized to the correct dynamics.
-    var cell = cellResource(initialEffectiveIntegrand.getDynamics().map($ -> neverExpiring($.data().integral(currentValue(clampedStartingValue)))));
-    var effectiveIntegrand = clampedEffectiveIntegrand(integrand, minimum, maximum, cell);
-    // Use integrand's expiry but not integral's, since we're refreshing the integral
-    wheneverDynamicsChange(effectiveIntegrand, integrandDynamics -> {
-      cell.emit(bindEffect(integral -> ErrorCatchingMonad.map(integrandDynamics, integrand$ ->
-          neverExpiring(integrand$.data().integral(integral.extract())))));
-    });
-    // correction for discretely changing bounds / overshoots due to discretization of time
-    whenever(greaterThan(cell, maximum), () -> setValue(cell, currentValue(maximum)));
-    whenever(lessThan(cell, minimum), () -> setValue(cell, currentValue(minimum)));
-    return cell;
-  }
-
-  private static Resource<Polynomial> clampedEffectiveIntegrand(
-      Resource<Polynomial> integrand,
-      Resource<Polynomial> minimum,
-      Resource<Polynomial> maximum,
-      Resource<Polynomial> integral)
-  {
-    var impossible = lessThan(maximum, minimum);
-    var empty = lessThanOrEquals(integral, minimum);
-    var full = greaterThanOrEquals(integral, maximum);
-    return bind(impossible, empty, full, (impossible$, empty$, full$) -> {
-      if (impossible$.extract()) {
-        throw new IllegalStateException(
-            "Inverted bounds for clamped integral: maximum %f < minimum %f"
-                .formatted(currentValue(maximum), currentValue(minimum)));
-      }
-      Resource<Polynomial> result = integrand;
-      if (empty$.extract()) {
-        result = max(result, differentiate(minimum));
-      }
-      if (full$.extract()) {
-        result = min(result, differentiate(maximum));
-      }
-      return result;
-    });
-  }
-
-  private static void setValue(CellResource<Polynomial> cell, double value) {
-    cell.emit(effect(integralDynamics -> {
-      double[] coefficients = Arrays.copyOf(integralDynamics.coefficients(), integralDynamics.coefficients().length);
-      coefficients[0] = value;
-      return polynomial(coefficients);
-    }));
   }
 
   public static Resource<Polynomial> differentiate(Resource<Polynomial> p) {

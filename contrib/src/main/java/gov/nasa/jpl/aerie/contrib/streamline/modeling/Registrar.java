@@ -14,32 +14,18 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.RealDynamics;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.dynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Tracing.trace;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.not;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.when;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.effect;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad.map;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.call;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
-import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.waitUntil;
 import static java.util.stream.Collectors.joining;
-import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 public class Registrar {
   private final gov.nasa.jpl.aerie.merlin.framework.Registrar baseRegistrar;
@@ -92,22 +78,6 @@ public class Registrar {
         v -> RealDynamics.linear(v.data().extract(), v.data().rate()),
         e -> RealDynamics.constant(0)));
     logErrors(name, registeredResource);
-  }
-
-  public void assertion(final String message, final Resource<Discrete<Boolean>> assertion) {
-    assertion.registerName(message);
-    // Log an error when the assertion fails, i.e., on true -> false edges.
-    whenever(not(assertion), () -> {
-      var e = new AssertionError(message);
-      // TODO: Should assertions have a name, separate from their message?
-      logError(message, e);
-      // Use a new task to capture the reference to e.
-      // Without this, we replay and create a new object, so we can't remove the original.
-      call(replaying(() -> {
-        waitUntil(when(assertion));
-        removeError(message, e);
-      }));
-    });
   }
 
   private <D extends Dynamics<?, D>> void logErrors(String name, Resource<D> resource) {

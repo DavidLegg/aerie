@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.staticallyCreated;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
@@ -32,7 +34,7 @@ public final class Resources {
     currentTime();
   }
 
-  private static final CellResource<ClockDynamics> CLOCK = staticallyCreated(() -> cellResource(new ClockDynamics(ZERO)));
+  private static final Resource<Clock> CLOCK = staticallyCreated(() -> cellResource(clock(ZERO)));
   public static Duration currentTime() {
     return currentValue(CLOCK);
   }
@@ -156,17 +158,5 @@ public final class Resources {
       delay(interval);
       cell.emit($ -> newDynamics);
     }));
-  }
-
-  private record ClockDynamics(Duration time) implements Dynamics<Duration, ClockDynamics> {
-    @Override
-    public Duration extract() {
-      return time;
-    }
-
-    @Override
-    public ClockDynamics step(final Duration t) {
-      return new ClockDynamics(t.plus(time));
-    }
   }
 }

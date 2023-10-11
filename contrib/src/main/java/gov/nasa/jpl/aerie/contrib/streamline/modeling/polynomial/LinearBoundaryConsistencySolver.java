@@ -27,6 +27,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.success;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.GeneralConstraint.constraint;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.InequalityComparison.GreaterThanOrEquals;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.InequalityComparison.LessThanOrEquals;
@@ -59,7 +60,7 @@ public final class LinearBoundaryConsistencySolver {
   public LinearBoundaryConsistencySolver(String name) {
     this.name = name;
 
-    spawn(() -> {
+    spawn(contextualized(name + " solving", () -> {
       // Don't solve for the first time until sim starts.
       // This ensures all variables are initialized and all constraints are declared.
       buildNeighboringConstraints();
@@ -67,13 +68,13 @@ public final class LinearBoundaryConsistencySolver {
       // After that, solve whenever any of the driven terms change
       // OR a solved variable changes (which can only happen when it expires)
       Reactions.whenever(
-          () -> Stream.concat(
+          contextualized(name + " resolving condition", () -> Stream.concat(
               drivenTerms.stream(),
               variables.stream().map(Variable::resource))
                       .map(Resources::dynamicsChange)
-                      .reduce(Condition.FALSE, (c1, c2) -> c1.or(c2)),
+                      .reduce(Condition.FALSE, (c1, c2) -> c1.or(c2))),
           this::solve);
-    });
+    }));
   }
 
   public Variable variable(String name, Function<Domain, Expiring<Polynomial>> selectionPolicy) {
