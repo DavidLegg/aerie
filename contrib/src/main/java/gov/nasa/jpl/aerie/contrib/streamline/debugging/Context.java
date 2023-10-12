@@ -33,6 +33,7 @@ public final class Context {
     try {
       contexts.get().push(contextName);
       return action.get();
+      // TODO: Should we add a catch clause here that would add context to the error?
     } finally {
       // Doing the tear-down in a finally block maintains isolation for replaying tasks.
       contexts.get().pop();
