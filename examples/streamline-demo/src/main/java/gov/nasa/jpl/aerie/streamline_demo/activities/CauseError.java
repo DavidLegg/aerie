@@ -1,4 +1,4 @@
-package gov.nasa.jpl.aerie.streamline_demo;
+package gov.nasa.jpl.aerie.streamline_demo.activities;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
@@ -6,6 +6,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
 import gov.nasa.jpl.aerie.merlin.framework.annotations.ActivityType;
 import gov.nasa.jpl.aerie.merlin.framework.annotations.ActivityType.EffectModel;
 import gov.nasa.jpl.aerie.merlin.framework.annotations.Export.Parameter;
+import gov.nasa.jpl.aerie.streamline_demo.Mission;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.effect;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;

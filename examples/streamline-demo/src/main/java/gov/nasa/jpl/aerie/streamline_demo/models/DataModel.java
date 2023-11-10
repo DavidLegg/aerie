@@ -1,4 +1,4 @@
-package gov.nasa.jpl.aerie.streamline_demo;
+package gov.nasa.jpl.aerie.streamline_demo.models;
 
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.BooleanValueMapper;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
@@ -8,6 +8,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Domain;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
+import gov.nasa.jpl.aerie.streamline_demo.Configuration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;

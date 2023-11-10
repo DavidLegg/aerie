@@ -1,4 +1,4 @@
-package gov.nasa.jpl.aerie.streamline_demo;
+package gov.nasa.jpl.aerie.streamline_demo.models;
 
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.BooleanValueMapper;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.IntegerValueMapper;
@@ -7,6 +7,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
+import gov.nasa.jpl.aerie.streamline_demo.Configuration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
