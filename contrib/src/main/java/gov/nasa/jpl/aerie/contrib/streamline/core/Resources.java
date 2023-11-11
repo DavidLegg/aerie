@@ -5,13 +5,12 @@ import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
-import java.util.List;
 import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.staticallyCreated;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
@@ -42,21 +41,43 @@ public final class Resources {
   }
 
   public static <D> D currentData(Resource<D> resource) {
-    return resource.getDynamics().getOrThrow().data();
+    return data(resource.getDynamics());
   }
 
   public static <D> D currentData(Resource<D> resource, D dynamicsIfError) {
-    return resource.getDynamics().match(Expiring::data, error -> dynamicsIfError);
+    return data(resource.getDynamics(), dynamicsIfError);
   }
 
   public static <V, D extends Dynamics<V, D>> V currentValue(Resource<D> resource) {
-    return currentData(resource).extract();
+    return value(resource.getDynamics());
   }
 
   public static <V, D extends Dynamics<V, D>> V currentValue(Resource<D> resource, V valueIfError) {
-    return resource.getDynamics().match(result -> result.data().extract(), error -> valueIfError);
+    return value(resource.getDynamics(), valueIfError);
   }
 
+  public static <D> D data(ErrorCatching<Expiring<D>> dynamics) {
+    return dynamics.getOrThrow().data();
+  }
+
+  public static <D> D data(ErrorCatching<Expiring<D>> dynamics, D dynamicsIfError) {
+    return dynamics.match(Expiring::data, error -> dynamicsIfError);
+  }
+
+  public static <V, D extends Dynamics<V, D>> V value(ErrorCatching<Expiring<D>> dynamics) {
+    return data(dynamics).extract();
+  }
+
+  public static <V, D extends Dynamics<V, D>> V value(ErrorCatching<Expiring<D>> dynamics, V valueIfError) {
+    return dynamics.match(result -> result.data().extract(), error -> valueIfError);
+  }
+
+  /**
+   * Condition that's triggered when the dynamics on resource change in a way
+   * that's different from just evolving with time.
+   * This can be due to effects on a cell used by this resource,
+   * or by some part of the derivation expiring.
+   */
   public static <D extends Dynamics<?, D>> Condition dynamicsChange(Resource<D> resource) {
     final var startingDynamics = resource.getDynamics();
     final Duration startTime = currentTime();
@@ -81,6 +102,34 @@ public final class Resources {
     };
   }
 
+  /**
+   * A weaker form of {@link Resources#dynamicsChange},
+   * which doesn't attempt to compare dynamics.
+   * This Condition is less robust, and may trigger spuriously.
+   * However, this condition doesn't depend on dynamics having a well-behaved equals method.
+   */
+  public static Condition updates(Resource<?> resource) {
+    return new Condition() {
+      private boolean first = true;
+
+      @Override
+      public Optional<Duration> nextSatisfied(
+          final boolean positive,
+          final Duration atEarliest,
+          final Duration atLatest)
+      {
+        // Get resource to subscribe this condition to resource's cells
+        var dynamics = resource.getDynamics();
+        if (first) {
+          first = false;
+          return dynamics.match(Expiring::expiry, e -> NEVER).value().filter(atLatest::noShorterThan);
+        } else {
+          return Optional.of(atEarliest);
+        }
+      }
+    };
+  }
+
   // TODO: Should this be moved somewhere else?
   /**
    * Tests if two exceptions are equivalent from the point of view of resource values.
@@ -89,15 +138,6 @@ public final class Resources {
   public static boolean equivalentExceptions(Throwable startException, Throwable currentException) {
     return startException.getClass().equals(currentException.getClass())
            && startException.getMessage().equals(currentException.getMessage());
-  }
-
-  public static <D extends Dynamics<?, D>> Condition dynamicsChange(List<Resource<D>> resources) {
-    assert resources.size() > 0;
-    var result = dynamicsChange(resources.get(0));
-    for (Resource<D> r : resources) {
-      result = result.or(dynamicsChange(r));
-    }
-    return result;
   }
 
   /**
