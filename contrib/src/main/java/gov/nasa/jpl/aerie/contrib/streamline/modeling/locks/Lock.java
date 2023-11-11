@@ -50,7 +50,7 @@ public class Lock<P extends Comparable<? super P>> {
     // and grant equal-priority requests first-come, first-served.
     var lockState = new LockState<>(Pair.of(priority, currentTime().times(-1)), UUID.randomUUID());
     // Use a sub-task to capture lockState, even if this method was called from a replaying task.
-    call(replaying(() -> acquire(lockState)));
+    call(replaying(contextualized(() -> acquire(lockState))));
     // Read lockState out of the cell, in case this method was called from a replaying task.
     // That way, we'll read the UUID that was actually set, not one generated on a replay.
     return new AcquiredLock(getLockedState());
