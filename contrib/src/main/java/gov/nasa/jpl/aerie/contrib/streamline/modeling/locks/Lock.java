@@ -3,7 +3,6 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.locks;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
-import gov.nasa.jpl.aerie.merlin.framework.ModelActions;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,6 +37,8 @@ public class Lock<P extends Comparable<? super P>> {
    * If lock is already locked, wait until it's unlocked.
    * If several requests to acquire the lock are made simultaneously,
    * the highest priority request is granted first.
+   * Equal priority requests are granted first-come, first-served.
+   * Simultaneous equal-priority requests cause an error.
    * This repeats as many times as necessary to satisfy all requests.
    *
    * @param priority  Indicates the priority of this request.
@@ -48,29 +49,32 @@ public class Lock<P extends Comparable<? super P>> {
     // Use the pair (priority, -time) to grant higher priority locks first,
     // and grant equal-priority requests first-come, first-served.
     var lockState = new LockState<>(Pair.of(priority, currentTime().times(-1)), UUID.randomUUID());
-    acquire(lockState);
-    return new AcquiredLock(lockState);
+    // Use a sub-task to capture lockState, even if this method was called from a replaying task.
+    call(replaying(() -> acquire(lockState)));
+    // Read lockState out of the cell, in case this method was called from a replaying task.
+    // That way, we'll read the UUID that was actually set, not one generated on a replay.
+    return new AcquiredLock(getLockedState());
   }
 
   private void acquire(LockState<Pair<P, Duration>> lockState) {
-    call(replaying(contextualized(() -> {
+    // Since we expect to try to acquire locks a relatively small number of times,
+    // use a loop instead of a trampoline to avoid task-creation overhead.
+    while (true) {
+      // Use an if-unlocked instead of a wait-until-unlocked here, to reduce simulation engine cycles
+      // in the common case that the lock is free immediately.
       if (currentValue(unlocked)) {
         // cell is unlocked, try to lock it
         // Effect will acquire the lock iff cell is unlocked, or locked with a lower priority
         // If there are multiple acquire effects, highest priority wins.
         // If there's a tie for highest priority, that'll show up as conflicting effects.
-        cell.emit("Acquire lock (priority %s)".formatted(lockState.priority),
+        cell.emit("Request to acquire lock (priority %s)".formatted(lockState.priority),
                   effect(d$ -> Optional.of(
                       d$.filter(currentLock -> currentLock.priority.compareTo(lockState.priority) >= 0).orElse(lockState))));
-        // Now, delay zero and check if we actually acquired the lock
+        // Commit so we can observe concurrent requests
         delay(ZERO);
-        var cellState = currentValue(cell);
-        if (cellState.isEmpty()) {
-          // This should be impossible, and is only a sanity check.
-          throw new IllegalStateException("Lock failed.");
-        }
-        var actualLockstate = cellState.get();
-        if (actualLockstate.equals(lockState)) {
+        // Value of the cell after commit is the granted request
+        // Since we submitted a request, it can't be unlocked.
+        if (getLockedState().id.equals(lockState.id)) {
           // We acquired the lock. Exit immediately.
           return;
         }
@@ -78,8 +82,11 @@ public class Lock<P extends Comparable<? super P>> {
       }
       // It is locked. Wait for it to unlock and try again to acquire it.
       waitUntil(when(unlocked));
-      acquire(lockState);
-    })));
+    }
+  }
+
+  private LockState<Pair<P, Duration>> getLockedState() {
+    return currentValue(cell).orElseThrow(() -> new IllegalStateException("Lock suffered an internal error."));
   }
 
   /**
@@ -109,7 +116,7 @@ public class Lock<P extends Comparable<? super P>> {
   public final class AcquiredLock {
     private final LockState<Pair<P, Duration>> expectedLockState;
 
-    public AcquiredLock(final LockState<Pair<P, Duration>> expectedLockState) {
+    private AcquiredLock(final LockState<Pair<P, Duration>> expectedLockState) {
       this.expectedLockState = expectedLockState;
     }
 
