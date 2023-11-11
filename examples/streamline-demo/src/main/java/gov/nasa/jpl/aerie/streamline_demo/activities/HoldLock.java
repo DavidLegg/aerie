@@ -12,6 +12,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEf
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.increment;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.set;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
+import static gov.nasa.jpl.aerie.streamline_demo.generated.ActivityActions.call;
 
 @ActivityType("HoldLock")
 public class HoldLock {
@@ -32,7 +33,9 @@ public class HoldLock {
         decrement(mission.lockModel.pendingLockRequests);
         set(mission.lockModel.lockHolder, name);
         set(mission.lockModel.lockHolderPriority, priority);
-        delay(duration);
+        var acquiredSpan = new LockAcquired();
+        acquiredSpan.duration = duration;
+        call(mission, acquiredSpan);
         set(mission.lockModel.lockHolderPriority, null);
         set(mission.lockModel.lockHolder, "");
       });

@@ -7,6 +7,7 @@
 @WithActivityType(ChangeDesiredRate.class)
 @WithActivityType(CauseError.class)
 @WithActivityType(HoldLock.class)
+@WithActivityType(LockAcquired.class)
 
 package gov.nasa.jpl.aerie.streamline_demo;
 
@@ -18,3 +19,4 @@ import gov.nasa.jpl.aerie.merlin.framework.annotations.MissionModel.WithMappers;
 import gov.nasa.jpl.aerie.streamline_demo.activities.CauseError;
 import gov.nasa.jpl.aerie.streamline_demo.activities.ChangeDesiredRate;
 import gov.nasa.jpl.aerie.streamline_demo.activities.HoldLock;
+import gov.nasa.jpl.aerie.streamline_demo.activities.LockAcquired;
