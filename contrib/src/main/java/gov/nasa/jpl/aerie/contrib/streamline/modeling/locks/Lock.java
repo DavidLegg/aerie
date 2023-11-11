@@ -4,13 +4,16 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.merlin.framework.ModelActions;
+import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
@@ -22,7 +25,7 @@ import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.waitUntil;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 
 public class Lock<P extends Comparable<? super P>> {
-  private final CellResource<Discrete<Optional<LockState<P>>>> cell;
+  private final CellResource<Discrete<Optional<LockState<Pair<P, Duration>>>>> cell;
   private final Resource<Discrete<Boolean>> unlocked;
 
   public Lock() {
@@ -42,12 +45,14 @@ public class Lock<P extends Comparable<? super P>> {
    * @return An AcquiredLock object which can be used to release the lock later.
    */
   public AcquiredLock acquire(P priority) {
-    var lockState = new LockState<>(priority, UUID.randomUUID());
+    // Use the pair (priority, -time) to grant higher priority locks first,
+    // and grant equal-priority requests first-come, first-served.
+    var lockState = new LockState<>(Pair.of(priority, currentTime().times(-1)), UUID.randomUUID());
     acquire(lockState);
     return new AcquiredLock(lockState);
   }
 
-  private void acquire(LockState<P> lockState) {
+  private void acquire(LockState<Pair<P, Duration>> lockState) {
     call(replaying(contextualized(() -> {
       if (currentValue(unlocked)) {
         // cell is unlocked, try to lock it
@@ -102,9 +107,9 @@ public class Lock<P extends Comparable<? super P>> {
 
   private record LockState<P extends Comparable<? super P>>(P priority, UUID id) {}
   public final class AcquiredLock {
-    private final LockState<P> expectedLockState;
+    private final LockState<Pair<P, Duration>> expectedLockState;
 
-    public AcquiredLock(final LockState<P> expectedLockState) {
+    public AcquiredLock(final LockState<Pair<P, Duration>> expectedLockState) {
       this.expectedLockState = expectedLockState;
     }
 
