@@ -84,11 +84,6 @@ public final class Tracing {
       public ErrorCatching<Expiring<D>> getDynamics() {
         return tracedResource.getDynamics();
       }
-
-      @Override
-      public void registerName(final String name) {
-        resource.registerName(name);
-      }
     };
   }
 

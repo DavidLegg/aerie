@@ -3,6 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Context;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.merlin.framework.Scoped;
@@ -51,7 +52,6 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
       // have relatively few effects, and even fewer concurrent effects, so this is performant enough.
       // If that doesn't hold, a more specialized solution can be constructed directly.
       private final CellRef<Labelled<DynamicsEffect<D>>, Cell<D>> cell = allocate(initial, effectTrait);
-      private final List<String> names = new LinkedList<>();
 
       @Override
       public void emit(final Labelled<DynamicsEffect<D>> effect) {
@@ -63,17 +63,8 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
         return cell.get().dynamics;
       }
 
-      @Override
-      public void registerName(final String name) {
-        names.add(name);
-      }
-
       private String augmentEffectName(String effectName) {
-        var resourceName = switch (names.size()) {
-          case 0 -> "anonymous resource";
-          case 1 -> names.get(0);
-          default -> names.get(0) + " (aka. %s)".formatted(String.join(", ", names.subList(1, names.size())));
-        };
+        String resourceName = Naming.getName(this, "anonymous resource");
         return effectName + " on " + resourceName + Context.get().stream().map(c -> " during " + c).collect(joining());
       }
     };
@@ -93,11 +84,6 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
         // Keep the field access using () -> ... form, don't simplify to delegate::getDynamics
         // Simplifying will access delegate before calling actOnCell, failing if we need to re-allocate delegate.
         return actOnCell(() -> delegate.getDynamics());
-      }
-
-      @Override
-      public void registerName(final String name) {
-        delegate.registerName(name);
       }
 
       private void actOnCell(Runnable action) {

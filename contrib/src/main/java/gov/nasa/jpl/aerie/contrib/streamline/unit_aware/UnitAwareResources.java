@@ -40,11 +40,6 @@ public final class UnitAwareResources {
       public ErrorCatching<Expiring<D>> getDynamics() {
         return extendedScaling.apply(cellResource.getDynamics(), scale);
       }
-
-      @Override
-      public void registerName(final String name) {
-        resource.registerName(name);
-      }
     });
   }
 
