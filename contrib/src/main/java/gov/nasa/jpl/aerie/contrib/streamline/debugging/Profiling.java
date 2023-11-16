@@ -43,30 +43,31 @@ public final class Profiling {
   private static final Map<String, CallStats> conditionEvaluations = new HashMap<>();
   private static final Map<String, CallStats> taskExecutions = new HashMap<>();
 
-  /**
-   * Format name, but only if it's non-empty,
-   * to respect profiler short-circuiting for empty names.
-   */
-  public static String formatName(String format, String name) {
-    return isEmpty(name) ? name : format.formatted(name);
+  public static <D> Resource<D> profile(Resource<D> resource) {
+    return profile(Naming.getName(resource, "anonymous resource"), resource);
   }
 
   public static <D> Resource<D> profile(String name, Resource<D> resource) {
-    if (isEmpty(name)) return resource;
     initialize("Resource", resourceSamples, name);
     return () -> resourceSamples.get(name).accrue(resource::getDynamics);
   }
 
+  public static Condition profile(Condition condition) {
+    return profile(Naming.getName(condition, "anonymous condition"), condition);
+  }
+
   public static Condition profile(String name, Condition condition) {
-    if (isEmpty(name)) return condition;
     initialize("Condition", conditionEvaluations, name);
     return (positive, atEarliest, atLatest) ->
         conditionEvaluations.get(name).accrue(
             () -> condition.nextSatisfied(positive, atEarliest, atLatest));
   }
 
+  public static Supplier<Condition> profile(Supplier<Condition> conditionSupplier) {
+    return profile(Naming.getName(conditionSupplier, "anonymous condition"), conditionSupplier);
+  }
+
   public static Supplier<Condition> profile(String name, Supplier<Condition> conditionSupplier) {
-    if (isEmpty(name)) return conditionSupplier;
     initialize("Condition", conditionEvaluations, name);
     return () -> {
       final var condition = conditionSupplier.get();
@@ -76,10 +77,18 @@ public final class Profiling {
     };
   }
 
+  public static Runnable profile(Runnable task) {
+    return profile(Naming.getName(task, "anonymous task"), task);
+  }
+
   public static Runnable profile(String name, Runnable task) {
     if (isEmpty(name)) return task;
     initialize("Task", taskExecutions, name);
     return () -> taskExecutions.get(name).accrue(task);
+  }
+
+  public static <R> Supplier<R> profileTask(Supplier<R> task) {
+    return profileTask(Naming.getName(task, "anonymous task"), task);
   }
 
   public static <R> Supplier<R> profileTask(String name, Supplier<R> task) {

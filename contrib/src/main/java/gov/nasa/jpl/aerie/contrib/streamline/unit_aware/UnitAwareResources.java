@@ -2,7 +2,6 @@ package gov.nasa.jpl.aerie.contrib.streamline.unit_aware;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Labelled;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.DynamicsEffect;
@@ -10,6 +9,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -27,13 +27,13 @@ public final class UnitAwareResources {
     final BiFunction<ErrorCatching<Expiring<D>>, Double, ErrorCatching<Expiring<D>>> extendedScaling = extend(scaling, DynamicsMonad::map);
     return UnitAware.unitAware(resource, unit, (cellResource, scale) -> new CellResource<D>() {
       @Override
-      public void emit(final Labelled<DynamicsEffect<D>> effect) {
+      public void emit(final DynamicsEffect<D> effect) {
         // Use an effect in the scaled domain by first scaling the dynamics,
         // then applying the effect, then de-scaling the result back
-        cellResource.emit(new Labelled<>(
-            unscaledDynamics -> extendedScaling.apply(effect.data().apply(
-                extendedScaling.apply(unscaledDynamics, scale)), 1 / scale),
-            effect.name()));
+        DynamicsEffect<D> scaledEffect = unscaledDynamics ->
+            extendedScaling.apply(effect.apply(extendedScaling.apply(unscaledDynamics, scale)), 1 / scale);
+        Naming.registerName(scaledEffect, Naming.getName(effect, "anonymous effect"));
+        cellResource.emit(scaledEffect);
       }
 
       @Override

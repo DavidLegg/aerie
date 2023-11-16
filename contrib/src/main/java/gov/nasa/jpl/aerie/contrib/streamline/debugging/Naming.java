@@ -30,6 +30,13 @@ public final class Naming {
     NAMES.put(thing, name);
   }
 
+  // TODO: Should this support an aliasing system, whereby one object can inherit a name from another,
+  //       even if that name was set later?
+  // E.g., resource R is created, then approximated as R'. Finally, R' is registered, and thereby named.
+  // We'd like to see R inherit the name given to R', perhaps?
+  // Motivating concrete use case: Settable polynomials, which are approximated as linear for registration,
+  // but also have effect applied to them and so could use naming info for debugging.
+
   /**
    * Get the name for thing.
    * If thing has no registered name, return resultIfAnonymous instead.

@@ -122,8 +122,8 @@ public class Registrar {
   }
 
   private <D> Resource<D> debug(String name, Resource<D> resource) {
-    var tracedResource = trace ? trace(name, resource) : resource;
-    return profile ? profile(name, tracedResource) : tracedResource;
+    var tracedResource = trace ? trace(resource) : resource;
+    return profile ? profile(tracedResource) : tracedResource;
   }
 
   private <D extends Dynamics<?, D>> void logErrors(String name, Resource<D> resource) {
