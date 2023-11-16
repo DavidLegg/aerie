@@ -4,6 +4,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.util.function.BiFunction;
@@ -33,6 +34,8 @@ public final class Approximation {
       var newDynamics = resource.getDynamics().map(approximation);
       result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
     });
+    // Set up resource as a synonym for result, since result is often registered while resource isn't.
+    Naming.registerSynonym(result, resource);
     return result;
   }
 

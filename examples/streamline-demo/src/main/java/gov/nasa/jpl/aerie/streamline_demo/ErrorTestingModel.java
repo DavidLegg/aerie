@@ -36,14 +36,10 @@ public class ErrorTestingModel {
     registrar.discrete("errorTesting/bool", bool, new BooleanValueMapper());
     registrar.discrete("errorTesting/counter", counter, new IntegerValueMapper());
     // Explicitly register a name for continuous, because the derived linearized resource can't have effects
-    Naming.registerName(continuous, "errorTesting/continuous");
     registrar.real("errorTesting/continuous", DataModel.linearize(continuous));
     registrar.real("errorTesting/derived", DataModel.linearize(derived));
-    Naming.registerName(lowerBound, "errorTesting/lowerBound");
     registrar.real("errorTesting/lowerBound", DataModel.linearize(lowerBound));
-    Naming.registerName(upperBound, "errorTesting/upperBound");
     registrar.real("errorTesting/upperBound", DataModel.linearize(upperBound));
-    Naming.registerName(clamped, "errorTesting/clamped");
     registrar.real("errorTesting/clamped", DataModel.linearize(clamped));
   }
 }

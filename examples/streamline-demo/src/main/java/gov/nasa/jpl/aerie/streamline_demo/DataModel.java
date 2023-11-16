@@ -3,6 +3,7 @@ package gov.nasa.jpl.aerie.streamline_demo;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.BooleanValueMapper;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver;
@@ -100,7 +101,6 @@ public class DataModel {
   }
 
   private void registerStates(Registrar registrar, Configuration config) {
-    if (config.traceResources) registrar.setTrace();
     registrar.real("desiredRateA", linearize(desiredRateA));
     registrar.real("desiredRateB", linearize(desiredRateB));
     registrar.real("desiredRateC", linearize(desiredRateC));
@@ -120,16 +120,17 @@ public class DataModel {
             "Total volume must not exceed upper bound.",
             lessThanOrEquals(totalVolume, upperBoundOnTotalVolume)),
         new BooleanValueMapper());
-    registrar.clearTrace();
   }
 
   static Resource<Linear> linearize(Resource<Polynomial> p) {
-    return map(p, p$ -> {
+    var result = map(p, p$ -> {
       if (p$.degree() <= 1) {
         return linear(p$.getCoefficient(0), p$.getCoefficient(1));
       } else {
         throw new IllegalStateException("Resource was super-linear");
       }
     });
+    Naming.registerSynonym(result, p);
+    return result;
   }
 }
