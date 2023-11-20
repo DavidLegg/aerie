@@ -3,6 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.utils.DoubleUtils;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import org.apache.commons.math3.analysis.solvers.LaguerreSolver;
@@ -54,6 +55,23 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   @Override
   public Polynomial step(Duration t) {
     return t.isEqualTo(ZERO) ? this : polynomial(shift(coefficients(), t.ratioOver(SECOND)));
+  }
+
+  /**
+   * Number of machine epsilons to use for fuzzy equality.
+   */
+  private static final double FUZZY_EQUALITY_EPSILON_FACTOR = 5;
+
+  @Override
+  public boolean areEqualResults(final Polynomial left, final Polynomial right) {
+    if (left == right) return true;
+    // Note this will consider high-order coefficients very near zero as different from actually zero.
+    // This is a design choice, not a mistake, since polynomial degree is such an important property.
+    // Nearly-constant and actually-constant polynomials, for example, are treated differently despite
+    // nearly-equal values.
+    if (left.degree() != right.degree()) return false;
+    return IntStream.range(0, coefficients.length).allMatch(i -> DoubleUtils.areEqualResults(
+        this.getCoefficient(i), left.getCoefficient(i), right.getCoefficient(i)));
   }
 
   public int degree() {
@@ -237,25 +255,5 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
    */
   public double getCoefficient(int n) {
     return n >= coefficients().length ? 0.0 : coefficients()[n];
-  }
-
-  @Override
-  public boolean equals(final Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    Polynomial that = (Polynomial) o;
-    return Arrays.equals(coefficients, that.coefficients);
-  }
-
-  @Override
-  public int hashCode() {
-    return Arrays.hashCode(coefficients);
-  }
-
-  @Override
-  public String toString() {
-    return "Polynomial{" +
-           "coefficients=" + Arrays.toString(coefficients) +
-           '}';
   }
 }

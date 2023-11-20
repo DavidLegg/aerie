@@ -6,4 +6,8 @@ public interface Dynamics<V, D extends Dynamics<V, D>> {
     V extract();
 
     D step(Duration t);
+
+    default boolean areEqualResults(D left, D right) {
+      return left.equals(right);
+    }
 }

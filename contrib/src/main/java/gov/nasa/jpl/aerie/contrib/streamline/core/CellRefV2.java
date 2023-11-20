@@ -6,10 +6,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.CellType;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
-import java.util.List;
 import java.util.function.BinaryOperator;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
@@ -70,7 +67,7 @@ public final class CellRefV2 {
     return resolvingConcurrencyBy((left, right) -> x -> {
       final var lrx = left.apply(right.apply(x));
       final var rlx = right.apply(left.apply(x));
-      if (lrx.equals(rlx)) {
+      if (ErrorCatching.areEqualResults(x, lrx, rlx)) {
         return lrx;
       } else {
         throw new UnsupportedOperationException(

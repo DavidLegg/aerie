@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -12,6 +13,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.statically
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -83,14 +85,10 @@ public final class Resources {
     final Duration startTime = currentTime();
     return (positive, atEarliest, atLatest) -> {
       var currentDynamics = resource.getDynamics();
-      boolean haveChanged = startingDynamics.match(
-          start -> currentDynamics.match(
-              current -> !current.data().equals(start.data().step(currentTime().minus(startTime))),
-              ignored -> true),
-          startException -> currentDynamics.match(
-              ignored -> true,
-              // Use semantic comparison for exceptions, since derivation can generate the exception each invocation.
-              currentException -> !equivalentExceptions(startException, currentException)));
+      boolean haveChanged = !ErrorCatching.areEqualResults(
+          startingDynamics,
+          map(startingDynamics, d -> d.step(currentTime().minus(startTime))),
+          currentDynamics);
 
       return positive == haveChanged
           ? Optional.of(atEarliest)

@@ -326,19 +326,19 @@ public final class PolynomialResources {
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, p$ -> ExpiringToResourceMonad.unit(p$.greaterThan(threshold))));
+    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.greaterThan(threshold))));
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, p$ -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(threshold))));
+    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(threshold))));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, p$ -> ExpiringToResourceMonad.unit(p$.lessThan(threshold))));
+    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.lessThan(threshold))));
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, p$ -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(threshold))));
+    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(threshold))));
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, Resource<Polynomial> q) {
@@ -358,11 +358,11 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(ResourceMonad.bind(p, q, (p$, q$) -> ExpiringToResourceMonad.unit(p$.min(q$))));
+    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.min(q$))));
   }
 
   public static Resource<Polynomial> max(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(ResourceMonad.bind(p, q, (p$, q$) -> ExpiringToResourceMonad.unit(p$.max(q$))));
+    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.max(q$))));
   }
 
   /**

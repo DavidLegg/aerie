@@ -16,4 +16,8 @@ public record Expiring<D>(D data, Expiry expiry) {
   public static <D> Expiring<D> expiring(D data, Duration expiry) {
     return expiring(data, Expiry.at(expiry));
   }
+
+  public static <D extends Dynamics<?, D>> boolean areEqualResults(Expiring<D> original, Expiring<D> leftResult, Expiring<D> rightResult) {
+    return original.data.areEqualResults(leftResult.data, rightResult.data) && leftResult.expiry.equals(rightResult.expiry);
+  }
 }
