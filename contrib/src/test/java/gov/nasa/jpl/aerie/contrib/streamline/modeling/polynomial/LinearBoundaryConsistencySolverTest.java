@@ -1,10 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
+import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Domain;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -14,7 +10,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.LinearExpression.*;
@@ -29,7 +24,7 @@ class LinearBoundaryConsistencySolverTest {
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
   class SingleVariableSingleConstraint {
-    CellResource<Polynomial> driver = cellResource(polynomial(10));
+    CellResource<Polynomial> driver = CellResource.cellResource(polynomial(10));
     Resource<Polynomial> result;
 
     public SingleVariableSingleConstraint() {
@@ -49,14 +44,14 @@ class LinearBoundaryConsistencySolverTest {
 
     @Test
     void solver_reacts_to_driving_resource() {
-      set(driver, polynomial(20, -1, 3));
+      CellResource.set(driver, polynomial(20, -1, 3));
       settle();
       assertEquals(polynomial(20, -1, 3), currentData(result));
     }
 
     @Test
     void results_evolve_with_time() {
-      set(driver, polynomial(20, -1, 3));
+      CellResource.set(driver, polynomial(20, -1, 3));
       settle();
       assertEquals(polynomial(20, -1, 3), currentData(result));
       delay(10, SECONDS);
@@ -69,9 +64,9 @@ class LinearBoundaryConsistencySolverTest {
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
   class SingleVariableMultipleConstraint {
-    CellResource<Polynomial> lowerBound1 = cellResource(polynomial(10));
-    CellResource<Polynomial> lowerBound2 = cellResource(polynomial(20));
-    CellResource<Polynomial> upperBound = cellResource(polynomial(30));
+    CellResource<Polynomial> lowerBound1 = CellResource.cellResource(polynomial(10));
+    CellResource<Polynomial> lowerBound2 = CellResource.cellResource(polynomial(20));
+    CellResource<Polynomial> upperBound = CellResource.cellResource(polynomial(30));
     Resource<Polynomial> result;
 
     public SingleVariableMultipleConstraint() {
@@ -93,9 +88,9 @@ class LinearBoundaryConsistencySolverTest {
 
     @Test
     void fully_determined_bounds_are_allowed() {
-      set(lowerBound1, polynomial(10, 5));
-      set(lowerBound2, polynomial(12, 3));
-      set(upperBound, polynomial(12, 3));
+      CellResource.set(lowerBound1, polynomial(10, 5));
+      CellResource.set(lowerBound2, polynomial(12, 3));
+      CellResource.set(upperBound, polynomial(12, 3));
       settle();
       assertEquals(polynomial(12, 3), currentData(result));
     }
@@ -103,18 +98,18 @@ class LinearBoundaryConsistencySolverTest {
     @Test
     void tangent_bounds_use_dominant_behavior() {
       // Although lb1 == lb2 now, lb2 has a greater slope, so it dominates
-      set(lowerBound1, polynomial(12, 3, 5));
-      set(lowerBound2, polynomial(12, 4, -1));
-      set(upperBound, polynomial(12, 5));
+      CellResource.set(lowerBound1, polynomial(12, 3, 5));
+      CellResource.set(lowerBound2, polynomial(12, 4, -1));
+      CellResource.set(upperBound, polynomial(12, 5));
       settle();
       assertEquals(polynomial(12, 4, -1), currentData(result));
     }
 
     @Test
     void infeasible_bounds_result_in_failure() {
-      set(lowerBound1, polynomial(12, 3, 5));
-      set(lowerBound2, polynomial(12, 4, -1));
-      set(upperBound, polynomial(11, 7));
+      CellResource.set(lowerBound1, polynomial(12, 3, 5));
+      CellResource.set(lowerBound2, polynomial(12, 4, -1));
+      CellResource.set(upperBound, polynomial(11, 7));
       settle();
       assertInstanceOf(ErrorCatching.Failure.class, result.getDynamics());
     }
@@ -127,15 +122,15 @@ class LinearBoundaryConsistencySolverTest {
      */
     @Test
     void failures_are_cleared_if_problem_becomes_feasible_again() {
-      set(lowerBound1, polynomial(12, 3, 5));
-      set(lowerBound2, polynomial(12, 4, -1));
-      set(upperBound, polynomial(11, 7));
+      CellResource.set(lowerBound1, polynomial(12, 3, 5));
+      CellResource.set(lowerBound2, polynomial(12, 4, -1));
+      CellResource.set(upperBound, polynomial(11, 7));
       settle();
       assertInstanceOf(ErrorCatching.Failure.class, result.getDynamics());
 
-      set(lowerBound1, polynomial(10, 5));
-      set(lowerBound2, polynomial(12, 3));
-      set(upperBound, polynomial(12, 3));
+      CellResource.set(lowerBound1, polynomial(10, 5));
+      CellResource.set(lowerBound2, polynomial(12, 3));
+      CellResource.set(upperBound, polynomial(12, 3));
       settle();
       assertEquals(polynomial(12, 3), currentData(result));
     }
@@ -145,7 +140,7 @@ class LinearBoundaryConsistencySolverTest {
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
   class ScalingConstraint {
-    CellResource<Polynomial> driver = cellResource(polynomial(10));
+    CellResource<Polynomial> driver = CellResource.cellResource(polynomial(10));
     Resource<Polynomial> result;
 
     public ScalingConstraint() {
@@ -165,7 +160,7 @@ class LinearBoundaryConsistencySolverTest {
 
     @Test
     void scaling_is_respected_for_later_solutions() {
-      set(driver, polynomial(20, 4, -8));
+      CellResource.set(driver, polynomial(20, 4, -8));
       settle();
       assertEquals(polynomial(5, 1, -2), currentData(result));
     }
@@ -175,8 +170,8 @@ class LinearBoundaryConsistencySolverTest {
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
   class MultipleVariables {
-    CellResource<Polynomial> upperBound = cellResource(polynomial(10));
-    CellResource<Polynomial> upperBoundOnC = cellResource(polynomial(5));
+    CellResource<Polynomial> upperBound = CellResource.cellResource(polynomial(10));
+    CellResource<Polynomial> upperBoundOnC = CellResource.cellResource(polynomial(5));
     Resource<Polynomial> a, b, c;
 
     public MultipleVariables() {
@@ -208,8 +203,8 @@ class LinearBoundaryConsistencySolverTest {
 
     @Test
     void when_problem_is_fully_determined_the_solution_is_reached() {
-      set(upperBoundOnC, polynomial(0));
-      set(upperBound, polynomial(0));
+      CellResource.set(upperBoundOnC, polynomial(0));
+      CellResource.set(upperBound, polynomial(0));
       // Forces a = b = c = 0
       settle();
       assertEquals(polynomial(0), currentData(a));
@@ -219,8 +214,8 @@ class LinearBoundaryConsistencySolverTest {
 
     @Test
     void solving_works_on_higher_coefficients_too() {
-      set(upperBoundOnC, polynomial(5, -1));
-      set(upperBound, polynomial(10, -2));
+      CellResource.set(upperBoundOnC, polynomial(5, -1));
+      CellResource.set(upperBound, polynomial(10, -2));
       settle();
       assertEquals(polynomial(15, -3), currentData(a));
       assertEquals(polynomial(0), currentData(b));

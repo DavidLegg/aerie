@@ -2,13 +2,13 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
+import gov.nasa.jpl.aerie.merlin.framework.Scoped;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
 import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.staticallyCreated;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
@@ -35,9 +35,17 @@ public final class Resources {
     currentTime();
   }
 
-  private static final Resource<Clock> CLOCK = staticallyCreated(() -> cellResource(clock(ZERO)));
+  private static Resource<Clock> CLOCK = cellResource(clock(ZERO));
   public static Duration currentTime() {
-    return currentValue(CLOCK);
+    try {
+      return currentValue(CLOCK);
+    } catch (Scoped.EmptyDynamicCellException | IllegalArgumentException e) {
+      // If we're running unit tests, several simulations can happen without reloading the Resources class.
+      // In that case, we'll have discarded the clock resource we were using, and get the above exception.
+      // REVIEW: Is there a cleaner way to make sure this resource gets (re-)initialized?
+      CLOCK = cellResource(clock(ZERO));
+      return currentValue(CLOCK);
+    }
   }
 
   public static <D> D currentData(Resource<D> resource) {

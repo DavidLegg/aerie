@@ -10,6 +10,7 @@ import java.util.function.Supplier;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.dynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.updates;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.when;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
@@ -30,12 +31,12 @@ public final class Reactions {
   public static void whenever(Supplier<Condition> trigger, Runnable action) {
     final Condition condition = trigger.get();
     // Use replaying tasks to avoid threading overhead.
-    spawn(replaying(() -> {
+    spawn(replaying(contextualized(() -> {
       waitUntil(condition);
       action.run();
       // Trampoline off this task to avoid replaying.
       whenever(trigger, action);
-    }));
+    })));
   }
 
   // Special case for dynamicsChange condition, since it's non-obvious that this needs to be run in lambda form
@@ -52,10 +53,10 @@ public final class Reactions {
   }
 
   public static void every(Supplier<Duration> periodSupplier, Runnable action) {
-    spawn(replaying(() -> {
+    spawn(replaying(contextualized(() -> {
       delay(periodSupplier.get());
       action.run();
       every(periodSupplier, action);
-    }));
+    })));
   }
 }

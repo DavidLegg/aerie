@@ -3,7 +3,6 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.util.function.BiFunction;
@@ -14,7 +13,12 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.updates;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;
+import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
+import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
+import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
+import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 
 /**
  * General framework for approximating resources.
@@ -30,8 +34,31 @@ public final class Approximation {
       Resource<D> resource, Function<Expiring<D>, Expiring<E>> approximation) {
     var result = cellResource(resource.getDynamics().map(approximation));
     whenever(() -> updates(resource).or(updates(result)), () -> {
-      var newDynamics = resource.getDynamics().map(approximation);
-      result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
+      /*
+        Spawn and delay zero, because we have a 1-tick blindspot when using "updates"
+
+        Without the spawn/delay(0):
+        Simulation ticks         resource updates         approximate task
+                    0            update 0, delay(0)
+                                                          "updates" condition satisfied
+                    1            update 1                 update approx, see resource update 0 ONLY, set "updates" condition again
+                                                          "updates" condition unsatisfied
+
+        With the spawn/delay(0):
+        Simulation ticks         resource updates         approximate task
+                    0            update 0, delay(0)
+                                                          "updates" condition satisfied
+                    1            update 1                 spawn task, set "updates" condition again
+                                                          "updates" condition unsatisfied
+                    2                                     update approx, see resource update 1
+
+        Updates spaced at least 2 ticks apart will be caught by the next "updates" condition.
+       */
+      spawn(replaying(contextualized(() -> {
+        delay(ZERO);
+        var newDynamics = resource.getDynamics().map(approximation);
+        result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
+      })));
     });
     return result;
   }
