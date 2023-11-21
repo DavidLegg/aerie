@@ -12,6 +12,7 @@ import java.util.function.Function;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.dynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.updates;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
@@ -29,7 +30,7 @@ public final class Approximation {
   public static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> Resource<E> approximate(
       Resource<D> resource, Function<Expiring<D>, Expiring<E>> approximation) {
     var result = cellResource(resource.getDynamics().map(approximation));
-    whenever(() -> updates(resource).or(updates(result)), () -> {
+    whenever(() -> dynamicsChange(resource).or(dynamicsChange(result)), () -> {
       var newDynamics = resource.getDynamics().map(approximation);
       result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
     });

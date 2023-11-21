@@ -46,14 +46,15 @@ public final class UnstructuredResources {
     return ResourceMonad.map(a, b, (a$, b$) -> Unstructured.map(a$, b$, f));
   }
 
-  /**
-   * @see UnstructuredResources#map(Resource, Function)
-   */
-  public static <A, B, C, D> Resource<Unstructured<D>> map(
-      Resource<? extends Dynamics<A, ?>> a,
-      Resource<? extends Dynamics<B, ?>> b,
-      Resource<? extends Dynamics<C, ?>> c,
-      TriFunction<A, B, C, D> f) {
-    return ResourceMonad.map(a, b, c, (a$, b$, c$) -> Unstructured.map(a$, b$, c$, f));
-  }
+  // Commented out while debugging Unstructured resources and approximate.
+//  /**
+//   * @see UnstructuredResources#map(Resource, Function)
+//   */
+//  public static <A, B, C, D> Resource<Unstructured<D>> map(
+//      Resource<? extends Dynamics<A, ?>> a,
+//      Resource<? extends Dynamics<B, ?>> b,
+//      Resource<? extends Dynamics<C, ?>> c,
+//      TriFunction<A, B, C, D> f) {
+//    return ResourceMonad.map(a, b, c, (a$, b$, c$) -> Unstructured.map(a$, b$, c$, f));
+//  }
 }
