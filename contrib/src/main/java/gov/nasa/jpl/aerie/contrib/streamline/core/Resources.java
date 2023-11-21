@@ -7,6 +7,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
@@ -113,8 +114,25 @@ public final class Resources {
   /**
    * A weaker form of {@link Resources#dynamicsChange},
    * which doesn't attempt to compare dynamics.
+   * <p>
    * This Condition is less robust, and may trigger spuriously.
+   * When used in a reaction loop like {@link Reactions#wheneverUpdates(Resource, Consumer)},
+   * there is a known 1-tick "blindspot" after updates fires; if two updates happen to resource
+   * in back-to-back simulation ticks at the same time, only the first triggers the reaction loop.
+   * One way to handle this blindspot is with spawn and delay, like this:
+   * <pre>
+   * wheneverUpdates(resource, () -> {
+   *   // Handle the immediate update, if desired
+   *   spawn(replaying(() -> {
+   *     delay(ZERO);
+   *     // Handle an update 1 tick after the update that triggered this loop, if any happened.
+   *   }));
+   * });
+   * </pre>
+   * </p>
+   * <p>
    * However, this condition doesn't depend on dynamics having a well-behaved equals method.
+   * </p>
    */
   public static Condition updates(Resource<?> resource) {
     return new Condition() {
@@ -136,6 +154,12 @@ public final class Resources {
         }
       }
     };
+  }
+
+  public static Condition expires(Resource<?> resource) {
+    return (positive, atEarliest, atLatest) -> resource.getDynamics().match(
+        expiring -> expiring.expiry().value().filter(atLatest::noShorterThan).map(t -> Duration.max(t, atEarliest)),
+        error -> Optional.empty());
   }
 
   // TODO: Should this be moved somewhere else?

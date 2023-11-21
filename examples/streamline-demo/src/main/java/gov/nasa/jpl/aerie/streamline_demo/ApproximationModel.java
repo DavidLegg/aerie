@@ -4,6 +4,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.DifferentiableDynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.IntervalFunctions;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.Unstructured;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.UnstructuredResources;
@@ -12,7 +13,9 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.Approximation.approximate;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.IntervalFunctions.byBoundingError;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.SecantApproximation.ErrorEstimates.errorByOptimization;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.SecantApproximation.ErrorEstimates.errorByQuadraticApproximation;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.SecantApproximation.secantApproximation;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.constant;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.polynomialCellResource;
@@ -29,13 +32,13 @@ public class ApproximationModel {
       polynomial,
       secantApproximation(IntervalFunctions.<Polynomial>byUniformSampling(MINUTE)));
 
-//  public Resource<Linear> differentiableApproximation = approximate(
-//      map(polynomial, DifferentiableDynamics::asDifferentiable),
-//      secantApproximation(byBoundingError(
-//          TOLERANCE,
-//          SECOND,
-//          HOUR.times(24),
-//          errorByQuadraticApproximation())));
+  public Resource<Linear> differentiableApproximation = approximate(
+      map(polynomial, DifferentiableDynamics::asDifferentiable),
+      secantApproximation(byBoundingError(
+          TOLERANCE,
+          SECOND,
+          HOUR.times(24),
+          errorByQuadraticApproximation())));
 
   public Resource<Linear> directApproximation = approximate(
       polynomial,
@@ -63,7 +66,7 @@ public class ApproximationModel {
   public ApproximationModel(final Registrar registrar, final Configuration config) {
     registrar.real("approximation/hacked", hacked);
     registrar.real("approximation/uniform", uniformApproximation);
-    registrar.real("approximation/differentiable", ResourceMonad.unit(Linear.linear(1, 0)));
+    registrar.real("approximation/differentiable", differentiableApproximation);
     registrar.real("approximation/direct", directApproximation);
     registrar.real("approximation/uniform2", uniformApproximation2);
     registrar.real("approximation/direct2", directApproximation2);

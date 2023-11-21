@@ -1,6 +1,8 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
+import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -11,9 +13,12 @@ import java.util.function.Function;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverUpdates;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.expires;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.updates;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Context.contextualized;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Tracing.trace;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.delay;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.replaying;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.spawn;
@@ -33,34 +38,25 @@ public final class Approximation {
   public static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> Resource<E> approximate(
       Resource<D> resource, Function<Expiring<D>, Expiring<E>> approximation) {
     var result = cellResource(resource.getDynamics().map(approximation));
-    whenever(() -> updates(resource).or(updates(result)), () -> {
-      /*
-        Spawn and delay zero, because we have a 1-tick blindspot when using "updates"
-
-        Without the spawn/delay(0):
-        Simulation ticks         resource updates         approximate task
-                    0            update 0, delay(0)
-                                                          "updates" condition satisfied
-                    1            update 1                 update approx, see resource update 0 ONLY, set "updates" condition again
-                                                          "updates" condition unsatisfied
-
-        With the spawn/delay(0):
-        Simulation ticks         resource updates         approximate task
-                    0            update 0, delay(0)
-                                                          "updates" condition satisfied
-                    1            update 1                 spawn task, set "updates" condition again
-                                                          "updates" condition unsatisfied
-                    2                                     update approx, see resource update 1
-
-        Updates spaced at least 2 ticks apart will be caught by the next "updates" condition.
-       */
-      spawn(replaying(contextualized(() -> {
-        delay(ZERO);
-        var newDynamics = resource.getDynamics().map(approximation);
-        result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
-      })));
+    // Register the "updates" and "expires" conditions separately
+    // so that the "updates" condition isn't triggered spuriously.
+    wheneverUpdates(resource, newResourceDynamics -> {
+      System.out.println("Updating approximation because resource updated");
+      updateApproximation(newResourceDynamics, approximation, result);
+    });
+    whenever(expires(result), () -> {
+      System.out.println("Updating approximation because approximation expired");
+      updateApproximation(resource.getDynamics(), approximation, result);
     });
     return result;
+  }
+
+  private static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> void updateApproximation(
+      ErrorCatching<Expiring<D>> resourceDynamics, Function<Expiring<D>, Expiring<E>> approximation, CellResource<E> result) {
+    System.out.println("Resource dynamics: " + resourceDynamics);
+    var newDynamics = resourceDynamics.map(approximation);
+    System.out.println("Approx. dynamics: " + newDynamics);
+    result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
   }
 
   /**
