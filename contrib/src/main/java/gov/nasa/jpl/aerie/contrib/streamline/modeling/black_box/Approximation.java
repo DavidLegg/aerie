@@ -40,22 +40,14 @@ public final class Approximation {
     var result = cellResource(resource.getDynamics().map(approximation));
     // Register the "updates" and "expires" conditions separately
     // so that the "updates" condition isn't triggered spuriously.
-    wheneverUpdates(resource, newResourceDynamics -> {
-      System.out.println("Updating approximation because resource updated");
-      updateApproximation(newResourceDynamics, approximation, result);
-    });
-    whenever(expires(result), () -> {
-      System.out.println("Updating approximation because approximation expired");
-      updateApproximation(resource.getDynamics(), approximation, result);
-    });
+    wheneverUpdates(resource, newResourceDynamics -> updateApproximation(newResourceDynamics, approximation, result));
+    whenever(expires(result), () -> updateApproximation(resource.getDynamics(), approximation, result));
     return result;
   }
 
   private static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> void updateApproximation(
       ErrorCatching<Expiring<D>> resourceDynamics, Function<Expiring<D>, Expiring<E>> approximation, CellResource<E> result) {
-    System.out.println("Resource dynamics: " + resourceDynamics);
     var newDynamics = resourceDynamics.map(approximation);
-    System.out.println("Approx. dynamics: " + newDynamics);
     result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
   }
 
