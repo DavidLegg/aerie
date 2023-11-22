@@ -9,6 +9,8 @@ import org.apache.commons.math3.analysis.solvers.LaguerreSolver;
 import org.apache.commons.math3.complex.Complex;
 
 import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.DoublePredicate;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
@@ -141,52 +143,99 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   }
 
   public double evaluate(Duration t) {
-    return evaluate(t.ratioOver(SECOND));
+    // Although there are more efficient ways to evaluate a polynomial,
+    // it's *very* important to simulation stability that
+    // evaluate(t) agrees exactly with step(t).extract()
+    return step(t).extract();
   }
 
-  public double evaluate(double x) {
-    // Horner's method of polynomial evaluation:
-    // Transforms a_0 + a_1 x + a_2 x^2 + ... + a_n x^n
-    // into a_0 + x (a_1 + x (a_2 + ... x ( a_n ) ... ))
-    // Which can be done with one addition and one multiplication per coefficient,
-    // as opposed to the traditional method, which takes one addition and multiple multiplications.
-    final double[] coefficients = coefficients();
-    double accumulator = coefficients[coefficients.length - 1];
-    for (int i = coefficients.length - 2; i >= 0; --i) {
-      accumulator *= x;
-      accumulator += coefficients[i];
+  /**
+   * Find the first non-negative time when timePredicate is true
+   * and this polynomial is positive or non-negative, depending on strictness.
+   * This is a helper method to higher-level comparison and root-finding functions.
+   *
+   * <p>
+   *   We can often formulate the time that interesting changes happen as roots of a polynomial.
+   *   However, floating-point precision issues may mean that the polynomial we formulate,
+   *   with values near 0, has higher precision than the arguments we started with,
+   *   so we do an exhaustive search over the range indicated by the higher-precision formulation
+   *   to find the time when the lower-precision formulation changes.
+   * </p>
+   */
+  private Optional<Duration> findSupported(Predicate<Duration> timePredicate, boolean strict) {
+    DoublePredicate supportTest = strict ? x -> x > 0 : x -> x >= 0;
+    Duration root, start, end;
+    try {
+      if (supportTest.test(extract())) {
+        root = ZERO;
+      } else {
+        var t$ = findFutureRoots().findFirst();
+        if (t$.isEmpty()) return Optional.empty();
+        root = t$.get();
+      }
+
+      // Do an exponential search to bracket the transition time
+      Duration rangeSize = EPSILON;
+      if (timePredicate.test(root)) {
+        end = root;
+        start = end.minus(rangeSize);
+        while (timePredicate.test(start)) {
+          rangeSize = rangeSize.times(2);
+          start = end.minus(rangeSize);
+        }
+      } else {
+        start = root;
+        end = start.plus(rangeSize);
+        while (!timePredicate.test(end)) {
+          rangeSize = rangeSize.times(2);
+          end = start.plus(rangeSize);
+        }
+      }
+      // TODO: There's an unhandled edge case here, where timePredicate is satisfied in a period we jumped over.
+      //   Maybe try to use the precision of the arguments and the finer resolution polynomial "this"
+      //   to do a more thorough but still efficient search?
+    } catch (ArithmeticException e) {
+      // If we overflowed looking for a bracketing range, it effectively never transitions.
+      return Optional.empty();
     }
-    return accumulator;
+
+    // Do a binary search to find the exact transition time
+    while (end.longerThan(start.plus(EPSILON))) {
+      Duration midpoint = start.plus(end).dividedBy(2);
+      if (timePredicate.test(midpoint)) {
+        end = midpoint;
+      } else {
+        start = midpoint;
+      }
+    }
+    return Optional.of(end);
   }
 
-  private Expiring<Discrete<Boolean>> compare(DoublePredicate predicate, double threshold) {
-    return find(t -> predicate.test(evaluate(t)), threshold);
+  private Expiring<Discrete<Boolean>> greaterThan(Polynomial other, boolean strict) {
+    BiPredicate<Double, Double> comp = strict ? (x, y) -> x > y : (x, y) -> x >= y;
+    boolean result = comp.test(this.extract(), other.extract());
+    var expiry = result
+        // When result is true, expire when result is false, which has opposite strictness to this
+        ? other.subtract(this).findSupported(t -> !comp.test(this.evaluate(t), other.evaluate(t)), !strict)
+        // When result is false, expire when result is true, which has the same strictness to this
+        : this.subtract(other).findSupported(t -> comp.test(this.evaluate(t), other.evaluate(t)), strict);
+    return expiring(discrete(result), expiry(expiry));
   }
 
-  private Expiring<Discrete<Boolean>> find(Predicate<Duration> timePredicate, double target) {
-    final boolean currentValue = timePredicate.test(ZERO);
-    final var expiry = this.isConstant() || this.isNonFinite() ? NEVER : expiry(findFuturePreImage(target)
-        .flatMap(t -> IntStream.rangeClosed(-MAX_RANGE_FOR_ROOT_SEARCH, MAX_RANGE_FOR_ROOT_SEARCH)
-            .mapToObj(i -> t.plus(EPSILON.times(i))))
-        .filter(t -> (timePredicate.test(t) ^ currentValue) && t.isPositive())
-        .findFirst());
-    return expiring(discrete(currentValue), expiry);
+  public Expiring<Discrete<Boolean>> greaterThan(Polynomial other) {
+    return greaterThan(other, true);
   }
 
-  public Expiring<Discrete<Boolean>> greaterThan(double threshold) {
-    return compare(x -> x > threshold, threshold);
+  public Expiring<Discrete<Boolean>> greaterThanOrEquals(Polynomial other) {
+    return greaterThan(other, false);
   }
 
-  public Expiring<Discrete<Boolean>> greaterThanOrEquals(double threshold) {
-    return compare(x -> x >= threshold, threshold);
+  public Expiring<Discrete<Boolean>> lessThan(Polynomial other) {
+    return other.greaterThan(this);
   }
 
-  public Expiring<Discrete<Boolean>> lessThan(double threshold) {
-    return compare(x -> x < threshold, threshold);
-  }
-
-  public Expiring<Discrete<Boolean>> lessThanOrEquals(double threshold) {
-    return compare(x -> x <= threshold, threshold);
+  public Expiring<Discrete<Boolean>> lessThanOrEquals(Polynomial other) {
+    return other.greaterThanOrEquals(this);
   }
 
   private boolean dominates$(Polynomial other) {
@@ -199,7 +248,14 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   }
 
   private Expiring<Discrete<Boolean>> dominates(Polynomial other) {
-    return this.subtract(other).find(t -> this.step(t).dominates$(other.step(t)), 0);
+    boolean result = this.dominates$(other);
+    var difference = this.subtract(other);
+    var expiry = difference.isConstant() ? NEVER : expiry(result
+        // When result is true, this dominates other, change when this doesn't dominate.
+        ? other.subtract(this).findSupported(t -> !this.step(t).dominates$(other.step(t)), false)
+        // When result is false, other dominates this, change when this does dominate.
+        : difference.findSupported(t -> this.step(t).dominates$(other.step(t)), false));
+    return expiring(discrete(result), expiry);
   }
 
   public Expiring<Polynomial> min(Polynomial other) {
@@ -211,16 +267,15 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   }
 
   /**
-   * Finds all occasions in the future when this function will reach the target value.
+   * Finds all roots of this function in the future
    */
-  private Stream<Duration> findFuturePreImage(double target) {
-    // add a check for an infinite target (i.e. unbounded above/below) or a poorly behaved polynomial
-    if (!Double.isFinite(target) || this.isNonFinite()) {
+  private Stream<Duration> findFutureRoots() {
+    // If this polynomial can never have a root, fail immediately
+    if (this.isNonFinite() || this.isConstant()) {
       return Stream.empty();
     }
 
-    final double[] shiftedCoefficients = add(polynomial(-target)).coefficients();
-    final Complex[] solutions = new LaguerreSolver().solveAllComplex(shiftedCoefficients, 0);
+    final Complex[] solutions = new LaguerreSolver().solveAllComplex(coefficients, 0);
     return Arrays.stream(solutions)
                  .filter(solution -> Math.abs(solution.getImaginary()) < ROOT_FINDING_IMAGINARY_COMPONENT_TOLERANCE)
                  .map(Complex::getReal)

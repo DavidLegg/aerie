@@ -349,35 +349,35 @@ public final class PolynomialResources {
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.greaterThan(threshold))));
+    return greaterThan(p, constant(threshold));
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(threshold))));
+    return greaterThanOrEquals(p, constant(threshold));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.lessThan(threshold))));
+    return lessThan(p, constant(threshold));
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, double threshold) {
-    return signalling(bind(p, (Polynomial p$) -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(threshold))));
+    return lessThanOrEquals(p, constant(threshold));
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return greaterThan(subtract(p, q), 0);
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.greaterThan(q$))));
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return greaterThanOrEquals(subtract(p, q), 0);
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(q$))));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return lessThan(subtract(p, q), 0);
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.lessThan(q$))));
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return lessThanOrEquals(subtract(p, q), 0);
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(q$))));
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
