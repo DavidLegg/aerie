@@ -2,6 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -13,7 +14,6 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.DoublePredicate;
 import java.util.function.Predicate;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
@@ -150,76 +150,58 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
   }
 
   /**
-   * Find the first non-negative time when timePredicate is true
-   * and this polynomial is positive or non-negative, depending on strictness.
-   * This is a helper method to higher-level comparison and root-finding functions.
-   *
-   * <p>
-   *   We can often formulate the time that interesting changes happen as roots of a polynomial.
-   *   However, floating-point precision issues may mean that the polynomial we formulate,
-   *   with values near 0, has higher precision than the arguments we started with,
-   *   so we do an exhaustive search over the range indicated by the higher-precision formulation
-   *   to find the time when the lower-precision formulation changes.
-   * </p>
+   * Helper method for other comparison methods.
+   * Finds the first time the predicate is true, near the next root of this polynomial.
    */
-  private Optional<Duration> findSupported(Predicate<Duration> timePredicate, boolean strict) {
-    DoublePredicate supportTest = strict ? x -> x > 0 : x -> x >= 0;
+  private Expiry findExpiryNearRoot(Predicate<Duration> expires) {
     Duration root, start, end;
     try {
-      if (supportTest.test(extract())) {
-        root = ZERO;
-      } else {
-        var t$ = findFutureRoots().findFirst();
-        if (t$.isEmpty()) return Optional.empty();
-        root = t$.get();
-      }
+      var t$ = findFutureRoots().findFirst();
+      if (t$.isEmpty()) return NEVER;
+      root = t$.get();
 
       // Do an exponential search to bracket the transition time
-      Duration rangeSize = EPSILON;
-      if (timePredicate.test(root)) {
+      boolean initialTestResult = expires.test(root);
+      Duration rangeSize = EPSILON.times(initialTestResult ? -1 : 1);
+      Duration testPoint = root.plus(rangeSize);
+      while (expires.test(testPoint) == initialTestResult) {
+        rangeSize = rangeSize.times(2);
+        testPoint = root.plus(rangeSize);
+      }
+      if (initialTestResult) {
+        start = testPoint;
         end = root;
-        start = end.minus(rangeSize);
-        while (timePredicate.test(start)) {
-          rangeSize = rangeSize.times(2);
-          start = end.minus(rangeSize);
-        }
       } else {
         start = root;
-        end = start.plus(rangeSize);
-        while (!timePredicate.test(end)) {
-          rangeSize = rangeSize.times(2);
-          end = start.plus(rangeSize);
-        }
+        end = testPoint;
       }
+
       // TODO: There's an unhandled edge case here, where timePredicate is satisfied in a period we jumped over.
       //   Maybe try to use the precision of the arguments and the finer resolution polynomial "this"
       //   to do a more thorough but still efficient search?
     } catch (ArithmeticException e) {
       // If we overflowed looking for a bracketing range, it effectively never transitions.
-      return Optional.empty();
+      return NEVER;
     }
 
     // Do a binary search to find the exact transition time
     while (end.longerThan(start.plus(EPSILON))) {
       Duration midpoint = start.plus(end).dividedBy(2);
-      if (timePredicate.test(midpoint)) {
+      if (expires.test(midpoint)) {
         end = midpoint;
       } else {
         start = midpoint;
       }
     }
-    return Optional.of(end);
+    return Expiry.at(end);
   }
 
   private Expiring<Discrete<Boolean>> greaterThan(Polynomial other, boolean strict) {
     BiPredicate<Double, Double> comp = strict ? (x, y) -> x > y : (x, y) -> x >= y;
     boolean result = comp.test(this.extract(), other.extract());
-    var expiry = result
-        // When result is true, expire when result is false, which has opposite strictness to this
-        ? other.subtract(this).findSupported(t -> !comp.test(this.evaluate(t), other.evaluate(t)), !strict)
-        // When result is false, expire when result is true, which has the same strictness to this
-        : this.subtract(other).findSupported(t -> comp.test(this.evaluate(t), other.evaluate(t)), strict);
-    return expiring(discrete(result), expiry(expiry));
+    var expiry = this.subtract(other).findExpiryNearRoot(
+        t -> comp.test(this.evaluate(t), other.evaluate(t)) != result);
+    return expiring(discrete(result), expiry);
   }
 
   public Expiring<Discrete<Boolean>> greaterThan(Polynomial other) {
@@ -249,12 +231,7 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
 
   private Expiring<Discrete<Boolean>> dominates(Polynomial other) {
     boolean result = this.dominates$(other);
-    var difference = this.subtract(other);
-    var expiry = difference.isConstant() ? NEVER : expiry(result
-        // When result is true, this dominates other, change when this doesn't dominate.
-        ? other.subtract(this).findSupported(t -> !this.step(t).dominates$(other.step(t)), false)
-        // When result is false, other dominates this, change when this does dominate.
-        : difference.findSupported(t -> this.step(t).dominates$(other.step(t)), false));
+    var expiry = this.subtract(other).findExpiryNearRoot(t -> this.step(t).dominates$(other.step(t)) != result);
     return expiring(discrete(result), expiry);
   }
 
