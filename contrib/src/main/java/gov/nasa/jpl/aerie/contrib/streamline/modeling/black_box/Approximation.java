@@ -1,9 +1,10 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
+import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
@@ -13,7 +14,8 @@ import java.util.function.Function;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.updates;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverUpdates;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.expires;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
@@ -30,13 +32,19 @@ public final class Approximation {
   public static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> Resource<E> approximate(
       Resource<D> resource, Function<Expiring<D>, Expiring<E>> approximation) {
     var result = cellResource(resource.getDynamics().map(approximation));
-    whenever(() -> updates(resource).or(updates(result)), () -> {
-      var newDynamics = resource.getDynamics().map(approximation);
-      result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
-    });
+    // Register the "updates" and "expires" conditions separately
+    // so that the "updates" condition isn't triggered spuriously.
+    wheneverUpdates(resource, newResourceDynamics -> updateApproximation(newResourceDynamics, approximation, result));
+    whenever(expires(result), () -> updateApproximation(resource.getDynamics(), approximation, result));
     // Set up resource as a synonym for result, since result is often registered while resource isn't.
     Naming.registerSynonym(result, resource);
     return result;
+  }
+
+  private static <D extends Dynamics<?, D>, E extends Dynamics<?, E>> void updateApproximation(
+      ErrorCatching<Expiring<D>> resourceDynamics, Function<Expiring<D>, Expiring<E>> approximation, CellResource<E> result) {
+    var newDynamics = resourceDynamics.map(approximation);
+    result.emit("Update approximation to " + newDynamics, $ -> newDynamics);
   }
 
   /**
