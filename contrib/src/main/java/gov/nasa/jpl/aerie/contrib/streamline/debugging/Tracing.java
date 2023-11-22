@@ -22,7 +22,7 @@ public final class Tracing {
   private final static Stack<String> activeTracePoints = new Stack<>();
 
   public static <D> Resource<D> trace(Resource<D> resource) {
-    return trace(Naming.getName(resource, "anonymous resource"), resource);
+    return trace(Naming.getName(resource).orElse("anonymous resource"), resource);
   }
 
   public static <D> Resource<D> trace(String name, Resource<D> resource) {
@@ -30,7 +30,7 @@ public final class Tracing {
   }
 
   public static <D extends Dynamics<?, D>> CellResource<D> trace(CellResource<D> resource) {
-    return trace(Naming.getName(resource, "anonymous resource"), resource);
+    return trace(Naming.getName(resource).orElse("anonymous resource"), resource);
   }
 
   public static <D extends Dynamics<?, D>> CellResource<D> trace(String name, CellResource<D> resource) {
@@ -50,7 +50,7 @@ public final class Tracing {
   }
 
   public static Condition trace(Condition condition) {
-    return trace(Naming.getName(condition, "anonymous condition"), condition);
+    return trace(Naming.getName(condition).orElse("anonymous condition"), condition);
   }
 
   public static Condition trace(String name, Condition condition) {
@@ -59,7 +59,7 @@ public final class Tracing {
   }
 
   public static Supplier<Condition> trace(Supplier<Condition> condition) {
-    return trace(Naming.getName(condition, "anonymous condition"), condition);
+    return trace(Naming.getName(condition).orElse("anonymous condition"), condition);
   }
 
   public static Supplier<Condition> trace(String name, Supplier<Condition> condition) {

@@ -3,6 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.WeakHashMap;
 
 
@@ -45,12 +46,12 @@ public final class Naming {
 
   /**
    * Get the name for thing.
-   * If thing has no registered name and no named synonyms,
-   * return resultIfAnonymous instead.
+   * If thing has no registered name and no synonyms,
+   * returns empty.
    */
-  public static String getName(Object thing, String resultIfAnonymous) {
+  public static Optional<String> getName(Object thing) {
     final var directName = NAMES.get(thing);
-    if (directName != null) return directName;
+    if (directName != null) return Optional.of(directName);
     final var synonyms = SYNONYMS.get(thing);
     if (synonyms != null) {
       for (var synonymRef : synonyms) {
@@ -59,9 +60,9 @@ public final class Naming {
         if (synonym == null) continue;
         // Take the first synonymous name we can find
         final var synonymousName = NAMES.get(synonym);
-        if (synonymousName != null) return synonymousName;
+        if (synonymousName != null) return Optional.of(synonymousName);
       }
     }
-    return resultIfAnonymous;
+    return Optional.empty();
   }
 }

@@ -4,6 +4,7 @@ import gov.nasa.jpl.aerie.contrib.serialization.mappers.BooleanValueMapper;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.IntegerValueMapper;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -40,5 +41,7 @@ public class ErrorTestingModel {
     registrar.real("errorTesting/lowerBound", DataModel.linearize(lowerBound));
     registrar.real("errorTesting/upperBound", DataModel.linearize(upperBound));
     registrar.real("errorTesting/clamped", DataModel.linearize(clamped));
+    System.out.println("DEBUG: Dependencies of derived resource:");
+    System.out.println(Dependencies.describeDependencyGraph(derived));
   }
 }

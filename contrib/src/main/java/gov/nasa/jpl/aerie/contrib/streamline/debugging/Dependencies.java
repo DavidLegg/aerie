@@ -1,8 +1,10 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -36,11 +38,17 @@ public final class Dependencies {
    */
   public static String describeDependencyGraph(Object source) {
     StringBuilder builder = new StringBuilder();
+    Map<Object, String> tempNames = new HashMap<>();
     for (Object node : topologicalSort(source)) {
-      builder.append("%s --> %s%n".formatted(
-          node, getDependencies(node).stream()
-                                     .map(d -> Naming.getName(d, d.toString()))
-                                     .collect(joining(", "))));
+      var dependencies = getDependencies(node);
+      builder.append(nodeName(node, tempNames));
+      if (dependencies.isEmpty()) {
+        builder.append(" is a leaf\n");
+      } else {
+        builder.append(" --> ")
+               .append(dependencies.stream().map(n -> nodeName(n, tempNames)).collect(joining(", ")))
+               .append("\n");
+      }
     }
     return builder.toString();
   }
@@ -64,5 +72,10 @@ public final class Dependencies {
     visited.remove(node);
     finished.add(node);
     result.add(0, node);
+  }
+
+  private static String nodeName(Object node, Map<Object, String> tempNames) {
+    return Naming.getName(node)
+                 .orElseGet(() -> tempNames.computeIfAbsent(node, $ -> "A" + tempNames.size()));
   }
 }

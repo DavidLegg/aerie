@@ -56,8 +56,8 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
       }
 
       private void augmentEffectName(DynamicsEffect<D> effect) {
-        String effectName = Naming.getName(effect, "anonymous effect");
-        String resourceName = Naming.getName(this, "anonymous resource");
+        String effectName = Naming.getName(effect).orElse("anonymous effect");
+        String resourceName = Naming.getName(this).orElse("anonymous resource");
         String augmentedName = effectName + " on " + resourceName + Context.get().stream().map(c -> " during " + c).collect(joining());
         Naming.registerName(effect, augmentedName);
       }

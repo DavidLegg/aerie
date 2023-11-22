@@ -143,7 +143,7 @@ public final class CellRefV2 {
   }
 
   private static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> String getEffectName(E effect) {
-    return Naming.getName(effect, "anonymous effect");
+    return Naming.getName(effect).orElse("anonymous effect");
   }
 
   public static class Cell<D> {

@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core.monads;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies;
 import org.apache.commons.lang3.function.TriFunction;
 
 import java.util.function.BiFunction;
@@ -19,12 +20,14 @@ public final class ResourceMonad {
   }
 
   public static <A, B> Resource<B> bind(Resource<A> a, Function<A, Resource<B>> f) {
-    return ExpiringMonadTransformer.<A, Resource<A>, B, Resource<B>>bind(
+    var result = ExpiringMonadTransformer.<A, Resource<A>, B, Resource<B>>bind(
         ExpiringToResourceMonad::unit,
         ExpiringToResourceMonad::bind,
         ExpiringToResourceMonad::bind,
         a,
         f);
+    Dependencies.addDependency(result, a);
+    return result;
   }
 
   // Convenient methods defined in terms of bind and unit:
@@ -55,5 +58,22 @@ public final class ResourceMonad {
 
   public static <A, B, C> BiFunction<Resource<A>, Resource<B>, Resource<C>> lift(BiFunction<A, B, C> f) {
     return (a, b) -> map(a, b, f);
+  }
+
+  // Viewing this monad as an applicative functor:
+
+  public static <A, B> Resource<B> rapply1(Resource<A> a, Resource<Function<A, B>> F) {
+    return bind(F, f -> map(a, f));
+  }
+
+  public static <A, B> Resource<B> rapply2(Resource<A> a, Resource<Function<A, B>> F) {
+    return bind(a, a$ -> map(F, f -> f.apply(a$)));
+  }
+
+  public static <A, B> Resource<B> rapply3(Resource<A> a, Resource<Function<A, B>> f) {
+    Resource<B> result = () -> DynamicsMonad.bind(f.getDynamics(), f$ -> DynamicsMonad.map(a.getDynamics(), f$));
+    Dependencies.addDependency(result, a);
+    Dependencies.addDependency(result, f);
+    return result;
   }
 }

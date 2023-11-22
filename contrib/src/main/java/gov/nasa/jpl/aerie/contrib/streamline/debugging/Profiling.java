@@ -44,7 +44,7 @@ public final class Profiling {
   private static final Map<String, CallStats> taskExecutions = new HashMap<>();
 
   public static <D> Resource<D> profile(Resource<D> resource) {
-    return profile(Naming.getName(resource, "anonymous resource"), resource);
+    return profile(Naming.getName(resource).orElse("anonymous resource"), resource);
   }
 
   public static <D> Resource<D> profile(String name, Resource<D> resource) {
@@ -53,7 +53,7 @@ public final class Profiling {
   }
 
   public static Condition profile(Condition condition) {
-    return profile(Naming.getName(condition, "anonymous condition"), condition);
+    return profile(Naming.getName(condition).orElse("anonymous condition"), condition);
   }
 
   public static Condition profile(String name, Condition condition) {
@@ -64,7 +64,7 @@ public final class Profiling {
   }
 
   public static Supplier<Condition> profile(Supplier<Condition> conditionSupplier) {
-    return profile(Naming.getName(conditionSupplier, "anonymous condition"), conditionSupplier);
+    return profile(Naming.getName(conditionSupplier).orElse("anonymous condition"), conditionSupplier);
   }
 
   public static Supplier<Condition> profile(String name, Supplier<Condition> conditionSupplier) {
@@ -78,7 +78,7 @@ public final class Profiling {
   }
 
   public static Runnable profile(Runnable task) {
-    return profile(Naming.getName(task, "anonymous task"), task);
+    return profile(Naming.getName(task).orElse("anonymous task"), task);
   }
 
   public static Runnable profile(String name, Runnable task) {
@@ -88,7 +88,7 @@ public final class Profiling {
   }
 
   public static <R> Supplier<R> profileTask(Supplier<R> task) {
-    return profileTask(Naming.getName(task, "anonymous task"), task);
+    return profileTask(Naming.getName(task).orElse("anonymous task"), task);
   }
 
   public static <R> Supplier<R> profileTask(String name, Supplier<R> task) {

@@ -1,12 +1,12 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.CommutativityTestInput;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringToResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
@@ -48,7 +48,9 @@ public final class DiscreteResources {
   private DiscreteResources() {}
 
   public static <T> Resource<Discrete<T>> constant(T value) {
-    return DiscreteResourceMonad.unit(value);
+    var result = DiscreteResourceMonad.unit(value);
+    Naming.registerName(result, "Constant " + value);
+    return result;
   }
 
   // General discrete cell resource constructor
