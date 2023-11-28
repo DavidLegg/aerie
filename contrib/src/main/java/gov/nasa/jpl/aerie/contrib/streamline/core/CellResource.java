@@ -10,7 +10,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.unit;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.pure;
 import static java.util.stream.Collectors.joining;
 
 /**
@@ -26,11 +26,11 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
   }
 
   static <D extends Dynamics<?, D>> CellResource<D> cellResource(D initial) {
-    return cellResource(unit(initial));
+    return cellResource(pure(initial));
   }
 
   static <D extends Dynamics<?, D>> CellResource<D> cellResource(D initial, EffectTrait<DynamicsEffect<D>> effectTrait) {
-    return cellResource(unit(initial), effectTrait);
+    return cellResource(pure(initial), effectTrait);
   }
 
   static <D extends Dynamics<?, D>> CellResource<D> cellResource(ErrorCatching<Expiring<D>> initial) {
@@ -69,7 +69,7 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
   }
 
   static <D extends Dynamics<?, D>> void set(CellResource<D> resource, Expiring<D> newDynamics) {
-    resource.emit("Set " + newDynamics, ErrorCatchingMonad.<Expiring<D>, Expiring<D>>lift($ -> newDynamics)::apply);
+    resource.emit("Set " + newDynamics, ErrorCatchingMonad.<Expiring<D>, Expiring<D>>map($ -> newDynamics)::apply);
   }
 
 }

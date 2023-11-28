@@ -5,7 +5,6 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
-import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringToResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -40,7 +39,6 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.bindEffect;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.lift;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.assertThat;
@@ -55,7 +53,7 @@ public final class PolynomialResources {
   private PolynomialResources() {}
 
   public static Resource<Polynomial> constant(double value) {
-    var result = ResourceMonad.unit(polynomial(value));
+    var result = ResourceMonad.pure(polynomial(value));
     Naming.registerName(result, "Constant " + value);
     return result;
   }
@@ -151,7 +149,7 @@ public final class PolynomialResources {
         var data = polynomial(start.getValue(), slope).step(t.minus(startTime));
         result = expiring(data, endTime.minus(t));
       }
-      return ExpiringToResourceMonad.unit(result);
+      return ResourceMonad.pure(result);
     });
   }
 
@@ -183,7 +181,7 @@ public final class PolynomialResources {
   }
 
   public static Resource<Polynomial> sum(Stream<? extends Resource<Polynomial>> summands) {
-    return summands.reduce(constant(0), lift(Polynomial::add), lift(Polynomial::add)::apply);
+    return summands.reduce(constant(0), ResourceMonad.map(Polynomial::add), ResourceMonad.map(Polynomial::add)::apply);
   }
 
   /**
@@ -205,15 +203,14 @@ public final class PolynomialResources {
    */
   @SafeVarargs
   public static Resource<Polynomial> multiply(Resource<Polynomial>... factors) {
-    return Arrays.stream(factors)
-                 .reduce(constant(1), (p, q) -> map(p, q, Polynomial::multiply));
+    return product(Arrays.stream(factors));
   }
 
   /**
    * Multiply polynomial resources.
    */
   public static Resource<Polynomial> product(Stream<? extends Resource<Polynomial>> factors) {
-    return factors.reduce(constant(1), lift(Polynomial::multiply), lift(Polynomial::multiply)::apply);
+    return factors.reduce(constant(1), ResourceMonad.map(Polynomial::multiply), ResourceMonad.map(Polynomial::multiply)::apply);
   }
 
   /**
@@ -343,7 +340,7 @@ public final class PolynomialResources {
   public static Resource<Polynomial> movingAverage(Resource<Polynomial> p, Duration interval) {
     var pIntegral = integrate(p, 0);
     var shiftedIntegral = shift(pIntegral, interval, polynomial(0));
-    return divide(subtract(pIntegral, shiftedIntegral), DiscreteResourceMonad.unit(interval.ratioOver(SECOND)));
+    return divide(subtract(pIntegral, shiftedIntegral), DiscreteResourceMonad.pure(interval.ratioOver(SECOND)));
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, double threshold) {
@@ -363,27 +360,27 @@ public final class PolynomialResources {
   }
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.greaterThan(q$))));
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.greaterThan(q$))));
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.greaterThanOrEquals(q$))));
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.greaterThanOrEquals(q$))));
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.lessThan(q$))));
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.lessThan(q$))));
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.lessThanOrEquals(q$))));
+    return signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.lessThanOrEquals(q$))));
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.min(q$))));
+    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.min(q$))));
   }
 
   public static Resource<Polynomial> max(Resource<Polynomial> p, Resource<Polynomial> q) {
-    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ExpiringToResourceMonad.unit(p$.max(q$))));
+    return signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.max(q$))));
   }
 
   /**
