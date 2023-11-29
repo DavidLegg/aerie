@@ -20,9 +20,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MerlinExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DependenciesTest {
-  // Private unique token, used to detect when things are anonymous
-  private static final String ANON = "<ANONYMOUS>";
-
   Resource<Discrete<Boolean>> constantTrue = DiscreteResources.constant(true);
   Resource<Polynomial> constant1234 = constant(1234);
   Resource<Polynomial> constant5678 = constant(5678);

@@ -37,7 +37,7 @@ public final class Approximation {
     wheneverUpdates(resource, newResourceDynamics -> updateApproximation(newResourceDynamics, approximation, result));
     whenever(expires(result), () -> updateApproximation(resource.getDynamics(), approximation, result));
     // Set up resource as a synonym for result, since result is often registered while resource isn't.
-    Naming.registerSynonym(result, resource);
+    Naming.registerName(result, "Approximation of %s", resource);
     return result;
   }
 

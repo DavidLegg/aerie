@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.framework.Scoped;
@@ -90,7 +91,7 @@ public final class Resources {
   public static <D extends Dynamics<?, D>> Condition dynamicsChange(Resource<D> resource) {
     final var startingDynamics = resource.getDynamics();
     final Duration startTime = currentTime();
-    return (positive, atEarliest, atLatest) -> {
+    Condition result = (positive, atEarliest, atLatest) -> {
       var currentDynamics = resource.getDynamics();
       boolean haveChanged = startingDynamics.match(
           start -> currentDynamics.match(
@@ -109,6 +110,8 @@ public final class Resources {
                 exception -> Optional.empty())
             : Optional.empty();
     };
+    Naming.registerName(result, "Dynamics Change (%s)", resource);
+    return result;
   }
 
   /**
@@ -135,7 +138,7 @@ public final class Resources {
    * </p>
    */
   public static Condition updates(Resource<?> resource) {
-    return new Condition() {
+    var result = new Condition() {
       private boolean first = true;
 
       @Override
@@ -154,12 +157,16 @@ public final class Resources {
         }
       }
     };
+    Naming.registerName(result, "Updates (%s)", resource);
+    return result;
   }
 
   public static Condition expires(Resource<?> resource) {
-    return (positive, atEarliest, atLatest) -> resource.getDynamics().match(
+    Condition result = (positive, atEarliest, atLatest) -> resource.getDynamics().match(
         expiring -> expiring.expiry().value().filter(atLatest::noShorterThan).map(t -> Duration.max(t, atEarliest)),
         error -> Optional.empty());
+    Naming.registerName(result, "Expires (%s)", resource);
+    return result;
   }
 
   // TODO: Should this be moved somewhere else?
@@ -193,6 +200,7 @@ public final class Resources {
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
     var cell = cellResource(resource.getDynamics());
     wheneverDynamicsChange(resource, newDynamics -> cell.emit($ -> newDynamics));
+    Naming.registerName(cell, "Cache (%s)", resource);
     return cell;
   }
 
@@ -228,10 +236,12 @@ public final class Resources {
   public static <D extends Dynamics<?, D>> Resource<D> signalling(Resource<D> resource) {
     var cell = cellResource(discrete(Unit.UNIT));
     wheneverDynamicsChange(resource, ignored -> cell.emit($ -> $));
-    return () -> {
+    Resource<D> result = () -> {
       cell.getDynamics();
       return resource.getDynamics();
     };
+    Naming.registerName(result, "Signalling (%s)", resource);
+    return result;
   }
 
   public static <D extends Dynamics<?, D>> Resource<D> shift(Resource<D> resource, Duration interval, D initialDynamics) {
@@ -239,6 +249,7 @@ public final class Resources {
     delayedSet(cell, resource.getDynamics(), interval);
     wheneverDynamicsChange(resource, newDynamics ->
         delayedSet(cell, newDynamics, interval));
+    Naming.registerName(cell, "Shifted (%s)", resource);
     return cell;
   }
 

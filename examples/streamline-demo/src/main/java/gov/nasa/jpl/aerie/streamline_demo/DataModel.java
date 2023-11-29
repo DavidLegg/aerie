@@ -129,7 +129,7 @@ public class DataModel {
         throw new IllegalStateException("Resource was super-linear");
       }
     });
-    Naming.registerSynonym(result, p);
+    Naming.registerName(result, "%s", p);
     return result;
   }
 }

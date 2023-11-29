@@ -32,7 +32,7 @@ public final class UnitAwareResources {
         // then applying the effect, then de-scaling the result back
         DynamicsEffect<D> scaledEffect = unscaledDynamics ->
             extendedScaling.apply(effect.apply(extendedScaling.apply(unscaledDynamics, scale)), 1 / scale);
-        Naming.registerSynonym(effect, scaledEffect);
+        Naming.registerName(effect, "%s", scaledEffect);
         cellResource.emit(scaledEffect);
       }
 

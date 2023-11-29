@@ -41,7 +41,5 @@ public class ErrorTestingModel {
     registrar.real("errorTesting/lowerBound", DataModel.linearize(lowerBound));
     registrar.real("errorTesting/upperBound", DataModel.linearize(upperBound));
     registrar.real("errorTesting/clamped", DataModel.linearize(clamped));
-    System.out.println("DEBUG: Dependencies of derived resource:");
-    System.out.println(Dependencies.describeDependencyGraph(derived));
   }
 }
