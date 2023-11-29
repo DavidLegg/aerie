@@ -34,6 +34,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.every;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.equivalentExceptions;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
@@ -181,8 +182,8 @@ public final class DiscreteResources {
     // Short-circuiting and: Only gets right if left is true
     var result = bind(left, l -> l ? right : pure(false));
     // Manually add dependencies, since short-circuiting will break automatic dependency tracking.
-    Dependencies.addDependency(result, left);
-    Dependencies.addDependency(result, right);
+    addDependency(result, left);
+    addDependency(result, right);
     name(result, "(%s) and (%s)", left, right);
     return result;
   }
@@ -210,8 +211,8 @@ public final class DiscreteResources {
     // Short-circuiting or: Only gets right if left is false
     var result = bind(left, l -> l ? pure(true) : right);
     // Manually add dependencies, since short-circuiting will break automatic dependency tracking.
-    Dependencies.addDependency(result, left);
-    Dependencies.addDependency(result, right);
+    addDependency(result, left);
+    addDependency(result, right);
     name(result, "(%s) or (%s)", left, right);
     return result;
   }
@@ -247,8 +248,8 @@ public final class DiscreteResources {
   public static <D> Resource<D> choose(Resource<Discrete<Boolean>> condition, Resource<D> thenCase, Resource<D> elseCase) {
     var result = ResourceMonad.bind(condition, c -> c.extract() ? thenCase : elseCase);
     // Manually add dependencies, since short-circuiting will break automatic dependency tracking.
-    Dependencies.addDependency(result, thenCase);
-    Dependencies.addDependency(result, elseCase);
+    addDependency(result, thenCase);
+    addDependency(result, elseCase);
     name(result, "(%s) ? (%s) : (%s)", condition, thenCase, elseCase);
     return result;
   }

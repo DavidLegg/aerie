@@ -30,7 +30,7 @@ public class ErrorTestingModel {
 
   public CellResource<Polynomial> upperBound = polynomialCellResource(5);
   public CellResource<Polynomial> lowerBound = polynomialCellResource(-5);
-  public Resource<Polynomial> clamped = signalling(clamp(constant(10), lowerBound, upperBound));
+  public Resource<Polynomial> clamped = clamp(constant(10), lowerBound, upperBound);
 
   public ErrorTestingModel(final Registrar registrar, final Configuration config) {
     registrar.discrete("errorTesting/bool", bool, new BooleanValueMapper());

@@ -11,6 +11,7 @@ import org.apache.commons.lang3.function.TriFunction;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
 
 /**
@@ -27,8 +28,8 @@ public final class ResourceMonad {
 
   public static <A, B> Resource<B> apply(Resource<A> a, Resource<Function<A, B>> f) {
     Resource<B> result = ThinResourceMonad.apply(a, ThinResourceMonad.map(f, DynamicsMonad::apply))::getDynamics;
-    Dependencies.addDependency(result, a);
-    Dependencies.addDependency(result, f);
+    addDependency(result, a);
+    addDependency(result, f);
     return result;
   }
 

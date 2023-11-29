@@ -6,6 +6,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
@@ -40,6 +41,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.bi
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
@@ -254,6 +256,7 @@ public final class PolynomialResources {
         cell.emit(bindEffect(integral -> DynamicsMonad.map(integrandDynamics, integrand$ ->
             integrand$.integral(integral.extract())))));
     name(cell, "Integral (%s)", integrand);
+    addDependency(cell, integrand);
     return cell;
   }
 
@@ -321,13 +324,14 @@ public final class PolynomialResources {
     // Use a simple feedback loop on volumes to do the integration and clamping.
     // Clamping here takes care of discrete under-/overflows and overshooting bounds due to discrete time steps.
     var clampedCell = clamp(integral, lowerBound, upperBound);
-    var correctedCell = bind(clampedCell, v -> map(rate.resource(), r -> r.integral(v.extract())));
+    var correctedCell = map(clampedCell, rate.resource(), (v, r) -> r.integral(v.extract()));
     // Use the corrected integral values to set volumes, but erase expiry information in the process to avoid loops
     wheneverDynamicsChange(correctedCell, v -> integral.emit("Update clamped integral", $ -> v.map(p -> neverExpiring(p.data()))));
 
     name(integral, "Clamped Integral (%s)", integrand);
     name(overflowRate.resource(), "Overflow of %s", integral);
     name(underflowRate.resource(), "Underflow of %s", integral);
+    addDependency(integral, integrand);
     return new ClampedIntegrateResult(
         integral,
         overflowRate.resource(),

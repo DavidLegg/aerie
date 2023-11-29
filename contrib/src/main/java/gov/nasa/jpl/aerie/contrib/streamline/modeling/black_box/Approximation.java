@@ -5,6 +5,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
@@ -17,6 +18,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverUpdates;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.expires;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
@@ -39,6 +41,7 @@ public final class Approximation {
     whenever(expires(result), () -> updateApproximation(resource.getDynamics(), approximation, result));
     // Approximation is often used when registering resources, so result propagates its name to resource.
     name(resource, "%s", result);
+    addDependency(result, resource);
     return result;
   }
 
