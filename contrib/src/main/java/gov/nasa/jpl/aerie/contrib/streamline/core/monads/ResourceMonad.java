@@ -42,7 +42,9 @@ public final class ResourceMonad {
     ThinResource<ErrorCatching<Expiring<ThinResource<ErrorCatching<Expiring<A>>>>>> a$ = map(a, $ -> $);
     // Then use distributivity and basic joins to collapse the type.
     // The ::getDynamics at the end up-converts back to Resource, from ThinResource
-    return ThinResourceMonad.map(ThinResourceMonad.join(ThinResourceMonad.map(a$, ResourceMonad::distribute)), DynamicsMonad::join)::getDynamics;
+    Resource<A> result = ThinResourceMonad.map(ThinResourceMonad.join(ThinResourceMonad.map(a$, ResourceMonad::distribute)), DynamicsMonad::join)::getDynamics;
+    addDependency(result, a);
+    return result;
   }
 
   // Not strictly part of this monad, but commonly used to "fill the gap" when deriving resources with partial bindings

@@ -11,6 +11,8 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.eraseExpiry;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.forward;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.assertThat;
@@ -64,9 +66,9 @@ public class DataModel {
     var correctedVolumeB = map(clampedVolumeB, actualRateB, (v, r) -> r.integral(v.extract()));
     var correctedVolumeC = map(clampedVolumeC, actualRateC, (v, r) -> r.integral(v.extract()));
     // Use the corrected integral values to set volumes, but erase expiry information in the process to avoid loops:
-    wheneverDynamicsChange(correctedVolumeA, v -> this.volumeA.emit($ -> v.map(p -> neverExpiring(p.data()))));
-    wheneverDynamicsChange(correctedVolumeB, v -> this.volumeB.emit($ -> v.map(p -> neverExpiring(p.data()))));
-    wheneverDynamicsChange(correctedVolumeC, v -> this.volumeC.emit($ -> v.map(p -> neverExpiring(p.data()))));
+    forward(eraseExpiry(correctedVolumeA), this.volumeA);
+    forward(eraseExpiry(correctedVolumeB), this.volumeB);
+    forward(eraseExpiry(correctedVolumeC), this.volumeC);
 
     // Integrate the actual rates.
     totalVolume = add(this.volumeA, this.volumeB, this.volumeC);
@@ -114,12 +116,6 @@ public class DataModel {
     registrar.real("volumeC", linearize(volumeC));
     registrar.real("totalVolume", linearize(totalVolume));
     registrar.real("maxVolume", linearize(upperBoundOnTotalVolume));
-    registrar.discrete(
-        "totalVolumeConstraint",
-        assertThat(
-            "Total volume must not exceed upper bound.",
-            lessThanOrEquals(totalVolume, upperBoundOnTotalVolume)),
-        new BooleanValueMapper());
   }
 
   static Resource<Linear> linearize(Resource<Polynomial> p) {
