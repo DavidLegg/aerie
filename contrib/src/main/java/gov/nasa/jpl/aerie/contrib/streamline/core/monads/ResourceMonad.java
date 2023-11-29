@@ -4,6 +4,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ThinResource;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.*;
 import org.apache.commons.lang3.function.TriFunction;
 
@@ -25,7 +26,10 @@ public final class ResourceMonad {
   }
 
   public static <A, B> Resource<B> apply(Resource<A> a, Resource<Function<A, B>> f) {
-    return ThinResourceMonad.apply(a, ThinResourceMonad.map(f, DynamicsMonad::apply))::getDynamics;
+    Resource<B> result = ThinResourceMonad.apply(a, ThinResourceMonad.map(f, DynamicsMonad::apply))::getDynamics;
+    Dependencies.addDependency(result, a);
+    Dependencies.addDependency(result, f);
+    return result;
   }
 
   private static <A> ThinResource<ErrorCatching<Expiring<A>>> distribute(ErrorCatching<Expiring<ThinResource<A>>> a) {

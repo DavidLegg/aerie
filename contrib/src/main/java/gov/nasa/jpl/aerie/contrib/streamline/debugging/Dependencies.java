@@ -1,12 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.*;
 
 import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.joining;
@@ -34,13 +28,41 @@ public final class Dependencies {
   }
 
   /**
+   * Get all registered dependencies of dependent.
+   *
+   * @param elideAnonymousInteriorNodes When true, remove anonymous non-leaf dependencies and replace them with their dependencies.
+   */
+  public static Set<Object> getDependencies(Object dependent, boolean elideAnonymousInteriorNodes) {
+    if (!elideAnonymousInteriorNodes) {
+      return getDependencies(dependent);
+    } else {
+      Set<Object> result = new HashSet<>();
+      Set<Object> visited = new HashSet<>();
+      Deque<Object> frontier = new ArrayDeque<>(getDependencies(dependent));
+      Object node;
+      while ((node = frontier.poll()) != null) {
+        if (!visited.add(node)) continue;
+        Set<Object> nodeDependencies;
+        if (Naming.getName(node).isEmpty() && !(nodeDependencies = getDependencies(node)).isEmpty()) {
+          // Node is anonymous and interior, elide it by adding dependencies to frontier
+          frontier.addAll(nodeDependencies);
+        } else {
+          // Node is named or a leaf, include it in result and don't put dependencies on the frontier
+          result.add(node);
+        }
+      }
+      return result;
+    }
+  }
+
+  /**
    * Build a string formatting the dependency graph starting from source.
    */
-  public static String describeDependencyGraph(Object source) {
+  public static String describeDependencyGraph(Object source, boolean elideAnonymousInteriorNodes) {
     StringBuilder builder = new StringBuilder();
     Map<Object, String> tempNames = new HashMap<>();
-    for (Object node : topologicalSort(source)) {
-      var dependencies = getDependencies(node);
+    for (Object node : topologicalSort(source, elideAnonymousInteriorNodes)) {
+      var dependencies = getDependencies(node, elideAnonymousInteriorNodes);
       builder.append(nodeName(node, tempNames));
       if (dependencies.isEmpty()) {
         builder.append(" is a leaf\n");
@@ -53,21 +75,21 @@ public final class Dependencies {
     return builder.toString();
   }
 
-  private static List<Object> topologicalSort(Object root) {
+  private static List<Object> topologicalSort(Object root, boolean elideAnonymousInteriorNodes) {
     // Algorithm from https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
     List<Object> result = new LinkedList<>();
     Set<Object> finished = new HashSet<>();
     Set<Object> visited = new HashSet<>();
-    tsVisit(root, result, finished, visited);
+    tsVisit(root, result, finished, visited, elideAnonymousInteriorNodes);
     return result;
   }
 
-  private static void tsVisit(Object node, List<Object> result, Set<Object> finished, Set<Object> visited) {
+  private static void tsVisit(Object node, List<Object> result, Set<Object> finished, Set<Object> visited, boolean elideAnonymousInteriorNodes) {
     if (finished.contains(node)) return;
     if (visited.contains(node)) return;
     visited.add(node);
-    for (var dependency : getDependencies(node)) {
-      tsVisit(dependency, result, finished, visited);
+    for (var dependency : getDependencies(node, elideAnonymousInteriorNodes)) {
+      tsVisit(dependency, result, finished, visited, elideAnonymousInteriorNodes);
     }
     visited.remove(node);
     finished.add(node);

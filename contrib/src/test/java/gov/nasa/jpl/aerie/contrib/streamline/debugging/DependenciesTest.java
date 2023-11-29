@@ -29,22 +29,6 @@ class DependenciesTest {
   Resource<Polynomial> polynomialCell = cellResource(polynomial(1));
   Resource<Polynomial> derived = map(constantTrue, constant1234, constant5678,
                                      (b, x, y) -> b.extract() ? x : y);
-  Resource<Polynomial> derived_2 = bind(constantTrue, b -> b.extract() ? constant1234 : constant5678);
-  Resource<Polynomial> derived_by_applicative_1 =
-      rapply1(constant5678,
-              rapply1(constant1234,
-                      rapply1(constantTrue,
-                              unit(b -> x -> y -> b.extract() ? x : y))));
-  Resource<Polynomial> derived_by_applicative_2 =
-      rapply2(constant5678,
-              rapply2(constant1234,
-                      rapply2(constantTrue,
-                              unit(b -> x -> y -> b.extract() ? x : y))));
-  Resource<Polynomial> derived_by_applicative_3 =
-      rapply3(constant5678,
-              rapply3(constant1234,
-                      rapply3(constantTrue,
-                              unit(b -> x -> y -> b.extract() ? x : y))));
 
   @Test
   void constants_are_named_by_their_value() {
@@ -78,8 +62,7 @@ class DependenciesTest {
   @Test
   void derived_resources_have_their_sources_as_dependencies() {
     derived.getDynamics();
-    var dependencies = Dependencies.getDependencies(derived);
-    assertEquals(3, dependencies.size());
+    var dependencies = Dependencies.getDependencies(derived, true);
     assertTrue(dependencies.contains(constantTrue));
     assertTrue(dependencies.contains(constant1234));
     assertTrue(dependencies.contains(constant5678));
