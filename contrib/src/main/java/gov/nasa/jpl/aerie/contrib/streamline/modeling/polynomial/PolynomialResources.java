@@ -24,7 +24,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -41,6 +40,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.bi
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.assertThat;
@@ -56,13 +56,13 @@ public final class PolynomialResources {
 
   public static Resource<Polynomial> constant(double value) {
     var result = ResourceMonad.pure(polynomial(value));
-    Naming.registerName(result, "Constant " + value);
+    name(result, "Constant " + value);
     return result;
   }
 
   public static UnitAware<Resource<Polynomial>> constant(UnitAware<Double> quantity) {
     var result = unitAware(constant(quantity.value()), quantity.unit());
-    Naming.registerName(result, "Constant " + quantity);
+    name(result, "Constant " + quantity);
     return result;
   }
 
@@ -90,7 +90,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> asPolynomial(Resource<Discrete<Double>> discrete) {
     var result = map(discrete, d -> polynomial(d.extract()));
-    Naming.registerName(result, "%s", discrete);
+    name(result, "%s", discrete);
     return result;
   }
 
@@ -189,7 +189,7 @@ public final class PolynomialResources {
   public static Resource<Polynomial> sum(Stream<? extends Resource<Polynomial>> summands) {
     var frozenSummands = summands.toList();
     var result = frozenSummands.stream().reduce(constant(0), ResourceMonad.map(Polynomial::add), ResourceMonad.map(Polynomial::add)::apply);
-    Naming.registerName(result, "Sum " + argsFormat(frozenSummands), frozenSummands.toArray());
+    name(result, "Sum " + argsFormat(frozenSummands), frozenSummands.toArray());
     return result;
   }
 
@@ -198,7 +198,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> subtract(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = map(p, q, Polynomial::subtract);
-    Naming.registerName(result, "(%s) - (%s)", p, q);
+    name(result, "(%s) - (%s)", p, q);
     return result;
   }
 
@@ -207,7 +207,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> negate(Resource<Polynomial> p) {
     var result = multiply(constant(-1), p);
-    Naming.registerName(result, "-(%s)", p);
+    name(result, "-(%s)", p);
     return result;
   }
 
@@ -225,7 +225,7 @@ public final class PolynomialResources {
   public static Resource<Polynomial> product(Stream<? extends Resource<Polynomial>> factors) {
     var frozenFactors = factors.toList();
     var result = frozenFactors.stream().reduce(constant(1), ResourceMonad.map(Polynomial::multiply), ResourceMonad.map(Polynomial::multiply)::apply);
-    Naming.registerName(result, "Product " + argsFormat(frozenFactors), frozenFactors.toArray());
+    name(result, "Product " + argsFormat(frozenFactors), frozenFactors.toArray());
     return result;
   }
 
@@ -237,7 +237,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> divide(Resource<Polynomial> p, Resource<Discrete<Double>> q) {
     var result = map(p, q, (p$, q$) -> p$.divide(q$.extract()));
-    Naming.registerName(result, "(%s) / (%s)", p, q);
+    name(result, "(%s) / (%s)", p, q);
     return result;
   }
 
@@ -253,7 +253,7 @@ public final class PolynomialResources {
     wheneverDynamicsChange(integrand, integrandDynamics ->
         cell.emit(bindEffect(integral -> DynamicsMonad.map(integrandDynamics, integrand$ ->
             integrand$.integral(integral.extract())))));
-    Naming.registerName(cell, "Integral (%s)", integrand);
+    name(cell, "Integral (%s)", integrand);
     return cell;
   }
 
@@ -325,9 +325,9 @@ public final class PolynomialResources {
     // Use the corrected integral values to set volumes, but erase expiry information in the process to avoid loops
     wheneverDynamicsChange(correctedCell, v -> integral.emit("Update clamped integral", $ -> v.map(p -> neverExpiring(p.data()))));
 
-    Naming.registerName(integral, "Clamped Integral (%s)", integrand);
-    Naming.registerName(overflowRate.resource(), "Overflow of %s", integral);
-    Naming.registerName(underflowRate.resource(), "Underflow of %s", integral);
+    name(integral, "Clamped Integral (%s)", integrand);
+    name(overflowRate.resource(), "Overflow of %s", integral);
+    name(underflowRate.resource(), "Underflow of %s", integral);
     return new ClampedIntegrateResult(
         integral,
         overflowRate.resource(),
@@ -354,7 +354,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> differentiate(Resource<Polynomial> p) {
     var result = map(p, Polynomial::derivative);
-    Naming.registerName(result, "Derivative %s", p);
+    name(result, "Derivative %s", p);
     return result;
   }
 
@@ -365,7 +365,7 @@ public final class PolynomialResources {
     var pIntegral = integrate(p, 0);
     var shiftedIntegral = shift(pIntegral, interval, polynomial(0));
     var result = divide(subtract(pIntegral, shiftedIntegral), DiscreteResourceMonad.pure(interval.ratioOver(SECOND)));
-    Naming.registerName(result, "Moving Average (%s)", p);
+    name(result, "Moving Average (%s)", p);
     return result;
   }
 
@@ -387,37 +387,37 @@ public final class PolynomialResources {
 
   public static Resource<Discrete<Boolean>> greaterThan(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.greaterThan(q$))));
-    Naming.registerName(result, "(%s) > (%s)", p, q);
+    name(result, "(%s) > (%s)", p, q);
     return result;
   }
 
   public static Resource<Discrete<Boolean>> greaterThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.greaterThanOrEquals(q$))));
-    Naming.registerName(result, "(%s) >= (%s)", p, q);
+    name(result, "(%s) >= (%s)", p, q);
     return result;
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.lessThan(q$))));
-    Naming.registerName(result, "(%s) < (%s)", p, q);
+    name(result, "(%s) < (%s)", p, q);
     return result;
   }
 
   public static Resource<Discrete<Boolean>> lessThanOrEquals(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.lessThanOrEquals(q$))));
-    Naming.registerName(result, "(%s) <= (%s)", p, q);
+    name(result, "(%s) <= (%s)", p, q);
     return result;
   }
 
   public static Resource<Polynomial> min(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.min(q$))));
-    Naming.registerName(result, "Min (%s, %s)", p, q);
+    name(result, "Min (%s, %s)", p, q);
     return result;
   }
 
   public static Resource<Polynomial> max(Resource<Polynomial> p, Resource<Polynomial> q) {
     var result = signalling(ResourceMonad.bind(p, q, (Polynomial p$, Polynomial q$) -> ResourceMonad.pure(p$.max(q$))));
-    Naming.registerName(result, "Max (%s, %s)", p, q);
+    name(result, "Max (%s, %s)", p, q);
     return result;
   }
 
@@ -426,7 +426,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> abs(Resource<Polynomial> p) {
     var result = max(p, negate(p));
-    Naming.registerName(result, "| %s |", p);
+    name(result, "| %s |", p);
     return result;
   }
 
@@ -444,7 +444,7 @@ public final class PolynomialResources {
             "Clamp lowerBound must be less than or equal to upperBound",
              lessThanOrEquals(lowerBound, upperBound)),
         $ -> result);
-    Naming.registerName(result$, "Clamp (%s)", p);
+    name(result$, "Clamp (%s)", p);
     return result$;
   }
 

@@ -14,6 +14,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.CellResource.cellResour
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -110,7 +111,7 @@ public final class Resources {
                 exception -> Optional.empty())
             : Optional.empty();
     };
-    Naming.registerName(result, "Dynamics Change (%s)", resource);
+    name(result, "Dynamics Change (%s)", resource);
     return result;
   }
 
@@ -157,7 +158,7 @@ public final class Resources {
         }
       }
     };
-    Naming.registerName(result, "Updates (%s)", resource);
+    name(result, "Updates (%s)", resource);
     return result;
   }
 
@@ -165,7 +166,7 @@ public final class Resources {
     Condition result = (positive, atEarliest, atLatest) -> resource.getDynamics().match(
         expiring -> expiring.expiry().value().filter(atLatest::noShorterThan).map(t -> Duration.max(t, atEarliest)),
         error -> Optional.empty());
-    Naming.registerName(result, "Expires (%s)", resource);
+    name(result, "Expires (%s)", resource);
     return result;
   }
 
@@ -200,7 +201,7 @@ public final class Resources {
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
     var cell = cellResource(resource.getDynamics());
     wheneverDynamicsChange(resource, newDynamics -> cell.emit($ -> newDynamics));
-    Naming.registerName(cell, "Cache (%s)", resource);
+    name(cell, "Cache (%s)", resource);
     return cell;
   }
 
@@ -240,7 +241,7 @@ public final class Resources {
       cell.getDynamics();
       return resource.getDynamics();
     };
-    Naming.registerName(result, "Signalling (%s)", resource);
+    name(result, "Signalling (%s)", resource);
     return result;
   }
 
@@ -249,7 +250,7 @@ public final class Resources {
     delayedSet(cell, resource.getDynamics(), interval);
     wheneverDynamicsChange(resource, newDynamics ->
         delayedSet(cell, newDynamics, interval));
-    Naming.registerName(cell, "Shifted (%s)", resource);
+    name(cell, "Shifted (%s)", resource);
     return cell;
   }
 

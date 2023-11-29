@@ -13,6 +13,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.assertThat;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear.linear;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
@@ -129,7 +130,8 @@ public class DataModel {
         throw new IllegalStateException("Resource was super-linear");
       }
     });
-    Naming.registerName(result, "%s", p);
+    // Reverse the normal direction of naming, so that names registered for result propagate back to p
+    name(p, "%s", result);
     return result;
   }
 }

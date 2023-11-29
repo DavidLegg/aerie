@@ -11,6 +11,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.allocate;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad.pure;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static java.util.stream.Collectors.joining;
 
 /**
@@ -21,7 +22,7 @@ import static java.util.stream.Collectors.joining;
 public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
   void emit(DynamicsEffect<D> effect);
   default void emit(String effectName, DynamicsEffect<D> effect) {
-    Naming.registerName(effect, effectName);
+    name(effect, effectName);
     emit(effect);
   }
 
@@ -56,10 +57,10 @@ public interface CellResource<D extends Dynamics<?, D>> extends Resource<D> {
       }
 
       private void augmentEffectName(DynamicsEffect<D> effect) {
-        String effectName = Naming.getName(effect).orElse("anonymous effect");
-        String resourceName = Naming.getName(this).orElse("anonymous resource");
+        String effectName = getName(effect).orElse("anonymous effect");
+        String resourceName = getName(this).orElse("anonymous resource");
         String augmentedName = effectName + " on " + resourceName + Context.get().stream().map(c -> " during " + c).collect(joining());
-        Naming.registerName(effect, augmentedName);
+        name(effect, augmentedName);
       }
     };
   }

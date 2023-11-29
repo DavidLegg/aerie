@@ -26,17 +26,10 @@ public final class Naming {
   private static final WeakHashMap<Object, Supplier<Optional<String>>> NAMES = new WeakHashMap<>();
 
   /**
-   * Register a name for thing.
-   */
-  public static void registerName(Object thing, String name) {
-    NAMES.put(thing, () -> Optional.of(name));
-  }
-
-  /**
    * Register a name for thing, as a function of args' names.
    * If any of the args are anonymous, so is this thing.
    */
-  public static void registerName(Object thing, String nameFormat, Object... args) {
+  public static void name(Object thing, String nameFormat, Object... args) {
     var args$ = Arrays.stream(args).map(WeakReference::new).toArray(WeakReference[]::new);
     NAMES.put(thing, () -> {
       Object[] argNames = new Object[args$.length];

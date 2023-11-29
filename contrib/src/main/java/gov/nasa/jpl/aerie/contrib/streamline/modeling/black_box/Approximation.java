@@ -17,6 +17,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverUpdates;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.expires;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad.bind;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
 /**
@@ -36,8 +37,8 @@ public final class Approximation {
     // so that the "updates" condition isn't triggered spuriously.
     wheneverUpdates(resource, newResourceDynamics -> updateApproximation(newResourceDynamics, approximation, result));
     whenever(expires(result), () -> updateApproximation(resource.getDynamics(), approximation, result));
-    // Set up resource as a synonym for result, since result is often registered while resource isn't.
-    Naming.registerName(result, "Approximation of %s", resource);
+    // Approximation is often used when registering resources, so result propagates its name to resource.
+    name(resource, "%s", result);
     return result;
   }
 

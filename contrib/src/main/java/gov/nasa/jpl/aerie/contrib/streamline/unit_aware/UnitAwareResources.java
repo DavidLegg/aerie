@@ -14,6 +14,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Quantities.quantity;
 
 public final class UnitAwareResources {
@@ -32,7 +33,7 @@ public final class UnitAwareResources {
         // then applying the effect, then de-scaling the result back
         DynamicsEffect<D> scaledEffect = unscaledDynamics ->
             extendedScaling.apply(effect.apply(extendedScaling.apply(unscaledDynamics, scale)), 1 / scale);
-        Naming.registerName(effect, "%s", scaledEffect);
+        name(effect, "%s", scaledEffect);
         cellResource.emit(scaledEffect);
       }
 

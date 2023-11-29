@@ -12,6 +12,7 @@ import java.util.function.Predicate;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching.failure;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 
 public final class CellRefV2 {
@@ -107,14 +108,14 @@ public final class CellRefV2 {
       @Override
       public DynamicsEffect<D> empty() {
         final DynamicsEffect<D> result = x -> x;
-        Naming.registerName(result, "No-op");
+        name(result, "No-op");
         return result;
       }
 
       @Override
       public DynamicsEffect<D> sequentially(final DynamicsEffect<D> prefix, final DynamicsEffect<D> suffix) {
         final DynamicsEffect<D> result = x -> suffix.apply(prefix.apply(x));
-        Naming.registerName(result, "(%s) then (%s)".formatted(getEffectName(prefix), getEffectName(suffix)));
+        name(result, "(%s) then (%s)".formatted(getEffectName(prefix), getEffectName(suffix)));
         return result;
       }
 
@@ -129,12 +130,11 @@ public final class CellRefV2 {
                   return failure(e);
                 }
               };
-          Naming.registerName(result, "(%s) and (%s)".formatted(getEffectName(left), getEffectName(right)));
+          name(result, "(%s) and (%s)".formatted(getEffectName(left), getEffectName(right)));
           return result;
         } catch (Throwable e) {
           final DynamicsEffect<D> result = $ -> failure(e);
-          Naming.registerName(
-              result, "Failed to combine concurrent effects: (%s) and (%s)".formatted(
+          name(result, "Failed to combine concurrent effects: (%s) and (%s)".formatted(
                   getEffectName(left), getEffectName(right)));
           return result;
         }
@@ -143,7 +143,7 @@ public final class CellRefV2 {
   }
 
   private static <D extends Dynamics<?, D>, E extends DynamicsEffect<D>> String getEffectName(E effect) {
-    return Naming.getName(effect).orElse("anonymous effect");
+    return getName(effect).orElse("anonymous effect");
   }
 
   public static class Cell<D> {
