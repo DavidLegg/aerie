@@ -11,6 +11,7 @@ public final class Dependencies {
   // Use a WeakHashMap so that describing a thing's dependencies
   // doesn't prevent it from being garbage-collected.
   private static final WeakHashMap<Object, Set<Object>> DEPENDENCIES = new WeakHashMap<>();
+  private static final WeakHashMap<Object, Set<Object>> DEPENDENTS = new WeakHashMap<>();
 
   /**
    * Register that dependent depends on dependency.
@@ -18,6 +19,7 @@ public final class Dependencies {
   public static void addDependency(Object dependent, Object dependency) {
     // Use WeakSet = newSetFromMap + WeakHashMap, to only weakly reference dependencies.
     DEPENDENCIES.computeIfAbsent(dependent, $ -> newSetFromMap(new WeakHashMap<>())).add(dependency);
+    DEPENDENTS.computeIfAbsent(dependency, $ -> newSetFromMap(new WeakHashMap<>())).add(dependent);
   }
 
   /**
@@ -28,30 +30,10 @@ public final class Dependencies {
   }
 
   /**
-   * Get all registered dependencies of dependent.
-   *
-   * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
+   * Get all registered dependents of dependency.
    */
-  public static Set<Object> getDependencies(Object dependent, boolean elideAnonymousNodes) {
-    if (!elideAnonymousNodes) {
-      return getDependencies(dependent);
-    } else {
-      Set<Object> result = new HashSet<>();
-      Set<Object> visited = new HashSet<>();
-      Deque<Object> frontier = new ArrayDeque<>(getDependencies(dependent));
-      Object node;
-      while ((node = frontier.poll()) != null) {
-        if (!visited.add(node)) continue;
-        if (Naming.getName(node).isEmpty()) {
-          // Node is anonymous and interior, elide it by adding dependencies to frontier
-          frontier.addAll(getDependencies(node));
-        } else {
-          // Node is named or a leaf, include it in result and don't put dependencies on the frontier
-          result.add(node);
-        }
-      }
-      return result;
-    }
+  public static Set<Object> getDependents(Object dependency) {
+    return DEPENDENTS.getOrDefault(dependency, Set.of());
   }
 
   /**
@@ -63,50 +45,104 @@ public final class Dependencies {
    * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
    */
   public static String describeDependencyGraph(Object source, boolean elideAnonymousNodes) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("flowchart TD\n");
+    return describeDependencyGraph(List.of(source), elideAnonymousNodes);
+  }
+
+  /**
+   * Build a string formatting the entire dependency graph.
+   * <p>
+   *     The result is in <a href="https://mermaid.js.org/">Mermaid</a> syntax
+   * </p>
+   *
+   * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
+   */
+  public static String describeDependencyGraph(boolean elideAnonymousNodes) {
+    return describeDependencyGraph(DEPENDENCIES.keySet(), elideAnonymousNodes);
+  }
+
+  /**
+   * Build a string formatting the dependency graph starting from sources.
+   * <p>
+   *     The result is in <a href="https://mermaid.js.org/">Mermaid</a> syntax
+   * </p>
+   *
+   * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
+   */
+  public static String describeDependencyGraph(Collection<?> sources, boolean elideAnonymousNodes) {
+    Map<Object, Set<Object>> dependencyGraph = new HashMap<>();
+    Map<Object, Set<Object>> dependentGraph = new HashMap<>();
+    for (var source : sources) {
+      buildClosure(source, dependencyGraph, dependentGraph);
+    }
+
+    if (elideAnonymousNodes) {
+      // Collapse anonymous nodes out of the graph
+      for (Object node : new ArrayList<>(dependencyGraph.keySet())) {
+        if (Naming.getName(node).isEmpty()) {
+          var dependencies = dependencyGraph.remove(node);
+          var dependents = dependentGraph.remove(node);
+          if (dependents != null) {
+            for (Object dependent : dependents) {
+              dependencyGraph.get(dependent).remove(node);
+              dependencyGraph.get(dependent).addAll(dependencies);
+            }
+            for (Object dependency : dependencies) {
+              dependentGraph.get(dependency).remove(node);
+              dependentGraph.get(dependency).addAll(dependents);
+            }
+          }
+        }
+      }
+    }
+
+    // Describe the result
     Map<Object, String> tempNames = new HashMap<>();
     Map<Object, String> nodeIds = new HashMap<>();
-    for (Object node : topologicalSort(source, elideAnonymousNodes)) {
-      var dependencies = getDependencies(node, elideAnonymousNodes);
-      if (dependencies.isEmpty()) {
-        builder.append("  ")
-                .append(nodeId(node, nodeIds))
-                .append("(\"")
-                .append(nodeName(node, tempNames).replace("\"", "#quot;"))
-                .append("\")\n");
-      } else {
-        builder.append("  ")
-                .append(nodeId(node, nodeIds))
-                .append("(\"")
-                .append(nodeName(node, tempNames).replace("\"", "#quot;"))
-                .append("\") --> ")
-                .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")))
-                .append("\n");
+    StringBuilder builder = new StringBuilder();
+    builder.append("flowchart TD\n");
+    // Traverse the condensed graph in topological order
+    Deque<Object> frontier = new ArrayDeque<>(dependencyGraph
+            .keySet()
+            .stream()
+            .filter(node -> dependentGraph.getOrDefault(node, Set.of()).isEmpty())
+            .toList());
+    Object node;
+    while ((node = frontier.poll()) != null) {
+      // Handle this node:
+      var dependencies = dependencyGraph.get(node);
+      builder.append("  ")
+              .append(nodeId(node, nodeIds))
+              .append("(\"")
+              .append(nodeName(node, tempNames).replace("\"", "#quot;"))
+              .append("\")");
+      if (!dependencies.isEmpty()) {
+        builder.append(" --> ")
+                .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")));
+      }
+      builder.append("\n");
+
+      // Remove node from the graph and search for new frontier nodes
+      dependencyGraph.remove(node);
+      for (var dependency : dependencies) {
+        dependentGraph.get(dependency).remove(node);
+        if (dependentGraph.get(dependency).isEmpty()) {
+          frontier.add(dependency);
+        }
       }
     }
     return builder.toString();
   }
 
-  private static List<Object> topologicalSort(Object root, boolean elideAnonymousInteriorNodes) {
-    // Algorithm from https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
-    List<Object> result = new LinkedList<>();
-    Set<Object> finished = new HashSet<>();
-    Set<Object> visited = new HashSet<>();
-    tsVisit(root, result, finished, visited, elideAnonymousInteriorNodes);
-    return result;
-  }
-
-  private static void tsVisit(Object node, List<Object> result, Set<Object> finished, Set<Object> visited, boolean elideAnonymousInteriorNodes) {
-    if (finished.contains(node)) return;
-    if (visited.contains(node)) return;
-    visited.add(node);
-    for (var dependency : getDependencies(node, elideAnonymousInteriorNodes)) {
-      tsVisit(dependency, result, finished, visited, elideAnonymousInteriorNodes);
+  private static void buildClosure(Object node, Map<Object, Set<Object>> dependencyGraph, Map<Object, Set<Object>> dependentGraph) {
+    if (dependencyGraph.containsKey(node)) return;
+    var dependencies = getDependencies(node);
+    dependencyGraph.computeIfAbsent(node, $ -> new HashSet<>()).addAll(dependencies);
+    for (var dependency : dependencies) {
+      dependentGraph.computeIfAbsent(dependency, $ -> new HashSet<>()).add(node);
     }
-    visited.remove(node);
-    finished.add(node);
-    result.add(0, node);
+    for (var dependency : dependencies) {
+      buildClosure(dependency, dependencyGraph, dependentGraph);
+    }
   }
 
   private static String nodeName(Object node, Map<Object, String> tempNames) {
