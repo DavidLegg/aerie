@@ -56,45 +56,33 @@ public final class Dependencies {
 
   /**
    * Build a string formatting the dependency graph starting from source.
+   * <p>
+   *     The result is in <a href="https://mermaid.js.org/">Mermaid</a> syntax
+   * </p>
    *
    * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
-   * @param elideLeaves When true, don't print separate lines for leaf nodes
-   * @param mermaidFormat When true, print output in <a href="https://mermaid.js.org/">Mermaid</a> graph syntax
    */
-  public static String describeDependencyGraph(Object source, boolean elideAnonymousNodes, boolean elideLeaves, boolean mermaidFormat) {
+  public static String describeDependencyGraph(Object source, boolean elideAnonymousNodes) {
     StringBuilder builder = new StringBuilder();
-    if (mermaidFormat) {
-      builder.append("flowchart TD\n");
-    }
+    builder.append("flowchart TD\n");
     Map<Object, String> tempNames = new HashMap<>();
     Map<Object, String> nodeIds = new HashMap<>();
     for (Object node : topologicalSort(source, elideAnonymousNodes)) {
       var dependencies = getDependencies(node, elideAnonymousNodes);
       if (dependencies.isEmpty()) {
-        if (mermaidFormat) {
-          builder.append("  ")
-                  .append(nodeId(node, nodeIds))
-                  .append("(\"")
-                  .append(nodeName(node, tempNames).replace("\"", "#quot;"))
-                  .append("\")\n");
-        } else if (!elideLeaves || node == source) {
-          builder.append(nodeName(node, tempNames)).append(" is a leaf\n");
-        }
+        builder.append("  ")
+                .append(nodeId(node, nodeIds))
+                .append("(\"")
+                .append(nodeName(node, tempNames).replace("\"", "#quot;"))
+                .append("\")\n");
       } else {
-        if (mermaidFormat) {
-          builder.append("  ")
-                  .append(nodeId(node, nodeIds))
-                  .append("(\"")
-                  .append(nodeName(node, tempNames).replace("\"", "#quot;"))
-                  .append("\") --> ")
-                  .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")))
-                  .append("\n");
-        } else {
-          builder.append(nodeName(node, tempNames))
-                  .append(" --> ")
-                  .append(dependencies.stream().map(n -> nodeName(n, tempNames)).collect(joining(", ")))
-                  .append("\n");
-        }
+        builder.append("  ")
+                .append(nodeId(node, nodeIds))
+                .append("(\"")
+                .append(nodeName(node, tempNames).replace("\"", "#quot;"))
+                .append("\") --> ")
+                .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")))
+                .append("\n");
       }
     }
     return builder.toString();

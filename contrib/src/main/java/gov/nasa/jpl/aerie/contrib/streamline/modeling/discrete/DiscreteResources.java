@@ -105,7 +105,8 @@ public final class DiscreteResources {
       final var newDynamics = resource.getDynamics();
       cell.emit($ -> newDynamics);
     });
-    name(cell, "Cache (%s)", cell);
+    name(cell, "Cache (%s)", resource);
+    addDependency(cell, resource);
     return cell;
   }
 

@@ -215,7 +215,7 @@ public final class Resources {
    */
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
     var cell = cellResource(resource.getDynamics());
-    wheneverDynamicsChange(resource, newDynamics -> cell.emit($ -> newDynamics));
+    forward(resource, cell);
     name(cell, "Cache (%s)", resource);
     return cell;
   }
