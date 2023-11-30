@@ -12,6 +12,7 @@ public final class Dependencies {
   // doesn't prevent it from being garbage-collected.
   private static final WeakHashMap<Object, Set<Object>> DEPENDENCIES = new WeakHashMap<>();
   private static final WeakHashMap<Object, Set<Object>> DEPENDENTS = new WeakHashMap<>();
+  private static final String ANONYMOUS_NAME = "...";
 
   /**
    * Register that dependent depends on dependency.
@@ -78,25 +79,22 @@ public final class Dependencies {
     if (elideAnonymousNodes) {
       // Collapse anonymous nodes out of the graph
       for (Object node : new ArrayList<>(dependencyGraph.keySet())) {
-        if (Naming.getName(node).isEmpty()) {
+        if (nodeName(node).equals(ANONYMOUS_NAME)) {
           var dependencies = dependencyGraph.remove(node);
           var dependents = dependentGraph.remove(node);
-          if (dependents != null) {
-            for (Object dependent : dependents) {
-              dependencyGraph.get(dependent).remove(node);
-              dependencyGraph.get(dependent).addAll(dependencies);
-            }
-            for (Object dependency : dependencies) {
-              dependentGraph.get(dependency).remove(node);
-              dependentGraph.get(dependency).addAll(dependents);
-            }
+          for (Object dependent : dependents) {
+            dependencyGraph.get(dependent).remove(node);
+            dependencyGraph.get(dependent).addAll(dependencies);
+          }
+          for (Object dependency : dependencies) {
+            dependentGraph.get(dependency).remove(node);
+            dependentGraph.get(dependency).addAll(dependents);
           }
         }
       }
     }
 
     // Describe the result
-    Map<Object, String> tempNames = new HashMap<>();
     Map<Object, String> nodeIds = new HashMap<>();
     StringBuilder builder = new StringBuilder();
     builder.append("flowchart TD\n");
@@ -113,7 +111,7 @@ public final class Dependencies {
       builder.append("  ")
               .append(nodeId(node, nodeIds))
               .append("(\"")
-              .append(nodeName(node, tempNames).replace("\"", "#quot;"))
+              .append(scrub(nodeName(node)))
               .append("\")");
       if (!dependencies.isEmpty()) {
         builder.append(" --> ")
@@ -137,6 +135,7 @@ public final class Dependencies {
     if (dependencyGraph.containsKey(node)) return;
     var dependencies = getDependencies(node);
     dependencyGraph.computeIfAbsent(node, $ -> new HashSet<>()).addAll(dependencies);
+    dependentGraph.computeIfAbsent(node, $ -> new HashSet<>());
     for (var dependency : dependencies) {
       dependentGraph.computeIfAbsent(dependency, $ -> new HashSet<>()).add(node);
     }
@@ -145,12 +144,21 @@ public final class Dependencies {
     }
   }
 
-  private static String nodeName(Object node, Map<Object, String> tempNames) {
-    return Naming.getName(node)
-                 .orElseGet(() -> tempNames.computeIfAbsent(node, $ -> "A" + tempNames.size()));
+  private static String nodeName(Object node) {
+    return Naming.getName(node, ANONYMOUS_NAME);
   }
 
   private static String nodeId(Object node, Map<Object, String> nodeIds) {
     return nodeIds.computeIfAbsent(node, $ -> "N" + nodeIds.size());
+  }
+
+  private static String scrub(String label) {
+    // Subset of commonly-used characters and their html entity replacements.
+    // An HTML escaping method would be better, but it's not worth adding a library just for that.
+    return label
+            .replace("\"", "&quot;")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
   }
 }
