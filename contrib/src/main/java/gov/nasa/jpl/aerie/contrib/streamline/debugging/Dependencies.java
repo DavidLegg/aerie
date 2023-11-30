@@ -98,15 +98,32 @@ public final class Dependencies {
     Map<Object, String> nodeIds = new HashMap<>();
     StringBuilder builder = new StringBuilder();
     builder.append("flowchart TD\n");
-    // Traverse the condensed graph in topological order
-    Deque<Object> frontier = new ArrayDeque<>(dependencyGraph
+    final Set<Object> visited = new HashSet<>();
+    // To produce good-looking graphs, visit nodes in topological order starting from roots.
+    dependencyGraph
             .keySet()
             .stream()
             .filter(node -> dependentGraph.getOrDefault(node, Set.of()).isEmpty())
-            .toList());
-    Object node;
-    while ((node = frontier.poll()) != null) {
-      // Handle this node:
+            .forEach(root -> describeSubgraph(root, dependencyGraph, nodeIds, visited, builder));
+    // Then, visit nodes starting from any sources involved in a cycle
+    // Finally, visit any remaining nodes arbitrarily
+    while (visited.size() < dependencyGraph.size()) {
+      var root = sources
+              .stream()
+              .filter(n -> !visited.contains(n))
+              .map((Object $) -> $)
+              .findFirst().or(() -> dependencyGraph.keySet()
+                      .stream()
+                      .filter(n -> !visited.contains(n))
+                      .findAny())
+              .orElseThrow();
+      describeSubgraph(root, dependencyGraph, nodeIds, visited, builder);
+    }
+    return builder.toString();
+  }
+
+  private static void describeSubgraph(Object root, Map<Object, Set<Object>> dependencyGraph, Map<Object, String> nodeIds, Set<Object> visited, StringBuilder builder) {
+    for (var node : topologicalSort(root, dependencyGraph, visited)) {
       var dependencies = dependencyGraph.get(node);
       builder.append("  ")
               .append(nodeId(node, nodeIds))
@@ -118,17 +135,7 @@ public final class Dependencies {
                 .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")));
       }
       builder.append("\n");
-
-      // Remove node from the graph and search for new frontier nodes
-      dependencyGraph.remove(node);
-      for (var dependency : dependencies) {
-        dependentGraph.get(dependency).remove(node);
-        if (dependentGraph.get(dependency).isEmpty()) {
-          frontier.add(dependency);
-        }
-      }
     }
-    return builder.toString();
   }
 
   private static void buildClosure(Object node, Map<Object, Set<Object>> dependencyGraph, Map<Object, Set<Object>> dependentGraph) {
@@ -142,6 +149,29 @@ public final class Dependencies {
     for (var dependency : dependencies) {
       buildClosure(dependency, dependencyGraph, dependentGraph);
     }
+  }
+
+  /**
+   * Cycle-tolerant depth-first topological sorting
+   */
+  private static List<Object> topologicalSort(Object root, Map<Object, Set<Object>> dependencyGraph, Set<Object> finished) {
+    // Algorithm from https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
+    Set<Object> visited = new HashSet<>();
+    List<Object> results = new LinkedList<>();
+    tsVisit(root, dependencyGraph, visited, finished, results);
+    return results;
+  }
+
+  private static void tsVisit(Object node, Map<Object, Set<Object>> dependencyGraph, Set<Object> visited, Set<Object> finished, List<Object> results) {
+    if (finished.contains(node)) return;
+    if (visited.contains(node)) return;
+    visited.add(node);
+    for (var dependency : dependencyGraph.get(node)) {
+      tsVisit(dependency, dependencyGraph, visited, finished, results);
+    }
+    visited.remove(node);
+    finished.add(node);
+    results.add(0, node);
   }
 
   private static String nodeName(Object node) {
