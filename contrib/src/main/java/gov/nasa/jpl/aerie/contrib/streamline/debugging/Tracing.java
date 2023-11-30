@@ -22,20 +22,28 @@ public final class Tracing {
   private final static Stack<String> activeTracePoints = new Stack<>();
 
   public static <D> Resource<D> trace(Resource<D> resource) {
-    return trace(Naming.getName(resource).orElse("anonymous resource"), resource);
+    return trace(() -> Naming.getName(resource).orElse("anonymous resource"), resource);
   }
 
   public static <D> Resource<D> trace(String name, Resource<D> resource) {
+    return trace(() -> name, resource);
+  }
+
+  public static <D> Resource<D> trace(Supplier<String> name, Resource<D> resource) {
     return () -> traceAction(name, resource::getDynamics);
   }
 
   public static <D extends Dynamics<?, D>> CellResource<D> trace(CellResource<D> resource) {
-    return trace(Naming.getName(resource).orElse("anonymous resource"), resource);
+    return trace(() -> Naming.getName(resource).orElse("anonymous resource"), resource);
   }
 
   public static <D extends Dynamics<?, D>> CellResource<D> trace(String name, CellResource<D> resource) {
-    return new CellResource<D>() {
-      private final Resource<D> tracedResoure = trace((Resource<D>) resource);
+    return trace(() -> name, resource);
+  }
+
+  public static <D extends Dynamics<?, D>> CellResource<D> trace(Supplier<String> name, CellResource<D> resource) {
+    return new CellResource<>() {
+      private final Resource<D> tracedResoure = trace(name, (Resource<D>) resource);
 
       @Override
       public void emit(final DynamicsEffect<D> effect) {
@@ -50,25 +58,33 @@ public final class Tracing {
   }
 
   public static Condition trace(Condition condition) {
-    return trace(Naming.getName(condition).orElse("anonymous condition"), condition);
+    return trace(() -> Naming.getName(condition).orElse("anonymous condition"), condition);
   }
 
   public static Condition trace(String name, Condition condition) {
+    return trace(() -> name, condition);
+  }
+
+  public static Condition trace(Supplier<String> name, Condition condition) {
     return (positive, atEarliest, atLatest) ->
-        traceAction(name + " evaluate (%s, %s, %s)".formatted(positive, atEarliest, atLatest), () -> condition.nextSatisfied(positive, atEarliest, atLatest));
+        traceAction(() -> name.get() + " evaluate (%s, %s, %s)".formatted(positive, atEarliest, atLatest), () -> condition.nextSatisfied(positive, atEarliest, atLatest));
   }
 
   public static Supplier<Condition> trace(Supplier<Condition> condition) {
-    return trace(Naming.getName(condition).orElse("anonymous condition"), condition);
+    return trace(() -> Naming.getName(condition).orElse("anonymous condition"), condition);
   }
 
   public static Supplier<Condition> trace(String name, Supplier<Condition> condition) {
-    // Trace calling the supplier separately from tracing the condition itself.
-    return () -> traceAction(name + " (generation)", () -> trace(name, condition.get()));
+    return trace(() -> name, condition);
   }
 
-  private static <T> T traceAction(String name, Supplier<T> action) {
-    activeTracePoints.push(name);
+  public static Supplier<Condition> trace(Supplier<String> name, Supplier<Condition> condition) {
+    // Trace calling the supplier separately from tracing the condition itself.
+    return () -> traceAction(() -> name.get() + " (generation)", () -> trace(name, condition.get()));
+  }
+
+  private static <T> T traceAction(Supplier<String> name, Supplier<T> action) {
+    activeTracePoints.push(name.get());
     System.out.printf("TRACE: %s - %s start...%n", currentTime(), formatStack());
     T result = action.get();
     System.out.printf("TRACE: %s - %s: %s%n", currentTime(), formatStack(), result);
