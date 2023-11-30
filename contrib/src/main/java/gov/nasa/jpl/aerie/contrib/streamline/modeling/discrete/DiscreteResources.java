@@ -171,6 +171,19 @@ public final class DiscreteResources {
     return DiscreteMonad.map(d, $ -> $ * scale);
   }
 
+  // Generally applicable derivations
+
+  public static <A> Resource<Discrete<Boolean>> equals(Resource<Discrete<A>> left, Resource<Discrete<A>> right) {
+    var result = map(left, right, Objects::equals);
+    name(result, "(%s) == (%s)", left, right);
+    return result;
+  }
+
+  public static <A> Resource<Discrete<Boolean>> notEquals(Resource<Discrete<A>> left, Resource<Discrete<A>> right) {
+    var result = not(equals(left, right));
+    name(result, "(%s) != (%s)", left, right);
+    return result;
+  }
 
   // Boolean logic
 
@@ -396,6 +409,12 @@ public final class DiscreteResources {
   public static <C extends Collection<?>> Resource<Discrete<Boolean>> isNonEmpty(Resource<Discrete<C>> resource) {
     var result = not(isEmpty(resource));
     name(result, "(%s) is not empty", resource);
+    return result;
+  }
+
+  public static <V, C extends Collection<V>> Resource<Discrete<Boolean>> contains(Resource<Discrete<C>> collection, Resource<Discrete<V>> value) {
+    var result = map(collection, value, Collection::contains);
+    name(result, "(%s) contains (%s)", collection, value);
     return result;
   }
 }
