@@ -1,6 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
@@ -42,6 +42,7 @@ public final class Profiling {
   private static final Map<String, CallStats> resourceSamples = new HashMap<>();
   private static final Map<String, CallStats> conditionEvaluations = new HashMap<>();
   private static final Map<String, CallStats> taskExecutions = new HashMap<>();
+  private static final Map<String, CallStats> effectsEmitted = new HashMap<>();
 
   public static <D> Resource<D> profile(Resource<D> resource) {
     return profile(Naming.getName(resource).orElse("anonymous resource"), resource);
@@ -97,6 +98,32 @@ public final class Profiling {
     return () -> taskExecutions.get(name).accrue(task);
   }
 
+  private static long ANONYMOUS_CELL_RESOURCE_ID = 0;
+  public static <D extends Dynamics<?, D>> CellResource<D> profileEffects(CellResource<D> resource) {
+    return new CellResource<>() {
+      private String name = null;
+      @Override
+      public void emit(DynamicsEffect<D> effect) {
+        // Get the name the first time an effect is emitted,
+        // which will be after any registrations happen.
+        if (name == null) {
+          name = Naming.getName(this).orElseGet(() -> {
+            var generatedName = "CellResource" + (ANONYMOUS_CELL_RESOURCE_ID++);
+            Naming.name(this, generatedName);
+            return generatedName;
+          });
+          initialize("Effects", effectsEmitted, name);
+        }
+        resource.emit(x -> effectsEmitted.get(name).accrue(() -> effect.apply(x)));
+      }
+
+      @Override
+      public ErrorCatching<Expiring<D>> getDynamics() {
+        return resource.getDynamics();
+      }
+    };
+  }
+
   private static void initialize(String typeName, Map<String, CallStats> resourceSamples, String name) {
     if (resourceSamples.containsKey(name)) {
       System.out.printf("WARNING! %s %s is already being profiled. This may be a name collision.%n", typeName, name);
@@ -119,6 +146,10 @@ public final class Profiling {
     if (!taskExecutions.isEmpty()) {
       System.out.println("Profiled tasks:");
       dumpSampleMap(taskExecutions, overallElapsedNanos);
+    }
+    if (!effectsEmitted.isEmpty()) {
+      System.out.println("Profiled effects:");
+      dumpSampleMap(effectsEmitted, overallElapsedNanos);
     }
   }
 
