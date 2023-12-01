@@ -64,7 +64,7 @@ public final class Dependencies {
   /**
    * Build a string formatting the dependency graph starting from sources.
    * <p>
-   *     The result is in <a href="https://mermaid.js.org/">Mermaid</a> syntax
+   *     The result is in DOT syntax.
    * </p>
    *
    * @param elideAnonymousNodes When true, remove anonymous nodes and replace them with their dependencies.
@@ -97,7 +97,7 @@ public final class Dependencies {
     // Describe the result
     Map<Object, String> nodeIds = new HashMap<>();
     StringBuilder builder = new StringBuilder();
-    builder.append("flowchart TD\n");
+    builder.append("digraph dependencies {\n");
     final Set<Object> visited = new HashSet<>();
     // To produce good-looking graphs, visit nodes in topological order starting from roots.
     dependencyGraph
@@ -119,6 +119,7 @@ public final class Dependencies {
               .orElseThrow();
       describeSubgraph(root, dependencyGraph, nodeIds, visited, builder);
     }
+    builder.append("}");
     return builder.toString();
   }
 
@@ -127,14 +128,16 @@ public final class Dependencies {
       var dependencies = dependencyGraph.get(node);
       builder.append("  ")
               .append(nodeId(node, nodeIds))
-              .append("(\"")
+              .append(" [label=\"")
               .append(scrub(nodeName(node)))
-              .append("\")");
-      if (!dependencies.isEmpty()) {
-        builder.append(" --> ")
-                .append(dependencies.stream().map(n -> nodeId(n, nodeIds)).collect(joining(" & ")));
+              .append("\"]\n");
+      for (var dependency : dependencies) {
+        builder.append("  ")
+                .append(nodeId(node, nodeIds))
+                .append(" -> ")
+                .append(nodeId(dependency, nodeIds))
+                .append(";\n");
       }
-      builder.append("\n");
     }
   }
 
@@ -183,12 +186,6 @@ public final class Dependencies {
   }
 
   private static String scrub(String label) {
-    // Subset of commonly-used characters and their html entity replacements.
-    // An HTML escaping method would be better, but it's not worth adding a library just for that.
-    return label
-            .replace("\"", "&quot;")
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;");
+    return label.replace("\"", "\\\"");
   }
 }
