@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
+// MD: Unused imports
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
@@ -44,6 +45,8 @@ public final class Resources {
     currentTime();
   }
 
+  // MD: Mission models can be loaded without the intent to simulate (e.g. just to get the list of available activity types)
+  // MD: Initializing resources at import time seems... suspicious. What is the use case here?
   private static Resource<Clock> CLOCK = resource(clock(ZERO));
   public static Duration currentTime() {
     try {
@@ -52,6 +55,7 @@ public final class Resources {
       // If we're running unit tests, several simulations can happen without reloading the Resources class.
       // In that case, we'll have discarded the clock resource we were using, and get the above exception.
       // REVIEW: Is there a cleaner way to make sure this resource gets (re-)initialized?
+      // MD: TODO: I need to understand what's going on here
       CLOCK = resource(clock(ZERO));
       return currentValue(CLOCK);
     }
@@ -65,6 +69,8 @@ public final class Resources {
     return data(resource.getDynamics(), dynamicsIfError);
   }
 
+  // MD: I think currentData vs currentValue is not an immediately obvious distinction.
+  // Would documentation help? Or, consider renaming `currentValue` to `currentDynamics`?
   public static <V, D extends Dynamics<V, D>> V currentValue(Resource<D> resource) {
     return value(resource.getDynamics());
   }
@@ -96,6 +102,7 @@ public final class Resources {
    * or by some part of the derivation expiring.
    */
   public static <D extends Dynamics<?, D>> Condition dynamicsChange(Resource<D> resource) {
+    // MD: TODO: Think hard about the semantics here and below
     final var startingDynamics = resource.getDynamics();
     final Duration startTime = currentTime();
     Condition result = (positive, atEarliest, atLatest) -> {
@@ -188,6 +195,7 @@ public final class Resources {
   }
 
   // TODO: Should this be moved somewhere else?
+  // MD: Should it?
   /**
    * Tests if two exceptions are equivalent from the point of view of resource values.
    * Two exceptions are equivalent if they have the same type and message.
@@ -216,7 +224,7 @@ public final class Resources {
    * </p>
    */
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
-    var cell = resource(resource.getDynamics());
+    final var cell = resource(resource.getDynamics());
     forward(resource, cell);
     name(cell, "Cache (%s)", resource);
     return cell;

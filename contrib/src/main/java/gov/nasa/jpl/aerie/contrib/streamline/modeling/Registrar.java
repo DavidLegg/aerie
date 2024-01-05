@@ -46,9 +46,12 @@ import static java.util.stream.Collectors.joining;
  * </p>
  */
 public class Registrar {
+  // MD: Having to wrap the registrar is a little strange. Need to consider whether it's acceptable to have it just be
+  // part of "the boilerplate", or if we should incorporate this into the framework (and drag its dependencies along with it)
   private final gov.nasa.jpl.aerie.merlin.framework.Registrar baseRegistrar;
   private boolean trace = false;
   private boolean profile = false;
+  // MD: I would consider using serializable events, rather than resources, to log errors
   private final MutableResource<Discrete<Map<Throwable, Set<String>>>> errors;
   private final ErrorBehavior errorBehavior;
 
@@ -64,12 +67,19 @@ public class Registrar {
     Throw
   }
 
+  // MD: While we're at it, the name Registrar, while descriptive, is not very intuitive, and is particularly confusing
+  // in the presence of the `Register` resource type.
   public Registrar(final gov.nasa.jpl.aerie.merlin.framework.Registrar baseRegistrar, final ErrorBehavior errorBehavior) {
+    // MD: Um. wat?
+    // MD: Re: wat. Ah... so Resources.init() is called here, because it is a safe bet that this method will be called
+    // during the mission model initialization phase.
     Resources.init();
     this.baseRegistrar = baseRegistrar;
     this.errorBehavior = errorBehavior;
-    errors = resource(Discrete.discrete(Map.of()));
+    errors = resource(Discrete.discrete(Map.of())); // MD: TODO prototype what this would look like using serialized events
     var errorString = map(errors, errors$ -> errors$.entrySet().stream().map(entry -> formatError(entry.getKey(), entry.getValue())).collect(joining("\n\n")));
+
+    // Register the errors and number of errors resources for output
     discrete("errors", errorString, new StringValueMapper());
     discrete("numberOfErrors", map(errors, Map::size), new IntegerValueMapper());
   }
@@ -98,6 +108,7 @@ public class Registrar {
     profile = true;
   }
 
+  // MD: This one should probably be profile = false;
   public void clearProfile() {
     profile = true;
   }
@@ -141,10 +152,12 @@ public class Registrar {
       // Avoid infinite loops by waiting for resource to clear before logging a new error.
       // TODO: This means we won't log if a resource changes from error1 to error2 without clearing in between.
       //   Maybe we should implement a condition like "is not the current error"?
+      // MD: That's interesting... how do you clear an error?
       waitUntil(when(not(hasError)));
     });
   }
 
+  // MD: Yeah, not so sure about adding Guava as an Aerie dependency
   // TODO: Consider pulling in a Guava MultiMap instead of doing this by hand below
   private Unit logError(String resourceName, Throwable e) {
     errors.emit(effect(s -> {
@@ -163,11 +176,15 @@ public class Registrar {
     return Unit.UNIT;
   }
 
+  /**
+   * Include the resource name in the error to give context
+   */
   private static <D> gov.nasa.jpl.aerie.merlin.framework.Resource<D> wrapErrors(String resourceName, gov.nasa.jpl.aerie.merlin.framework.Resource<D> resource) {
     return () -> {
       try {
         return resource.getDynamics();
       } catch (Throwable e) {
+        // MD: Broad catch... hmm...
         throw new RuntimeException("Error affecting " + resourceName, e);
       }
     };

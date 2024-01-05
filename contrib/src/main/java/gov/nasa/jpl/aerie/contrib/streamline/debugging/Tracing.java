@@ -44,6 +44,7 @@ public final class Tracing {
 
   public static <D extends Dynamics<?, D>> MutableResource<D> trace(Supplier<String> name, MutableResource<D> resource) {
     return new MutableResource<>() {
+      // MD: Typo in `tracedResoure`
       private final Resource<D> tracedResoure = trace(name, (Resource<D>) resource);
 
       @Override

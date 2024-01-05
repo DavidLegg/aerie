@@ -38,6 +38,7 @@ public final class CellRef<Event, State> {
 
   public static <Effect, State>
   CellRef<Effect, State> allocate(final State initialState, final CellType<Effect, State> applicator) {
+    // MD: Lingering terminology: consider dropping the word `applicator`
     return allocate(initialState, applicator, $ -> $);
   }
 

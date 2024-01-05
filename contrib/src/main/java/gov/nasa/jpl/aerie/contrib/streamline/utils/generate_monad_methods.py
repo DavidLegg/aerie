@@ -4,6 +4,8 @@ import string
 from collections import namedtuple
 from functools import partial
 
+# MD: Not immediately apparent what is going on here... may need some docstrings
+
 GENERATED_SECTION_START_COMMENT = '// GENERATED CODE START'
 GENERATED_SECTION_END_COMMENT = '// GENERATED CODE END'
 

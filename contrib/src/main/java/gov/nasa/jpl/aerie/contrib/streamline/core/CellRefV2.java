@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
+// MD: Remove unused import
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.merlin.protocol.model.CellType;
@@ -15,6 +16,20 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 
+// MD: The V2 naming is unfortunate - I can see the argument for moving this into the framework
+// MD: On the other hand, this is never called from user code...
+// MD: Maybe a javadoc?
+
+// MD: How general is this class? Does it completely obviate the need for CellRef?
+
+/**
+ * Utility class for a simplified allocate method.
+ *
+ * For starters, it blurs the distinction between event
+ * and effect, kind of like the allocate/2 method in CellRef.
+ *
+ *
+ */
 public final class CellRefV2 {
   private CellRefV2() {}
 
@@ -77,6 +92,8 @@ public final class CellRefV2 {
       if (commutativityTest.test(new CommutativityTestInput<>(x, lrx, rlx))) {
         return lrx;
       } else {
+        // MD: Future work: is there a way we can report this cleanly to the user? Does the
+        // error catching machinery already do that?
         throw new UnsupportedOperationException(
             "Detected non-commuting concurrent effects!");
       }
@@ -89,6 +106,10 @@ public final class CellRefV2 {
    * correctly comparing expiry and error information in the process.
    */
   public static <D> Predicate<CommutativityTestInput<ErrorCatching<Expiring<D>>>> testing(Predicate<CommutativityTestInput<D>> test) {
+    // If both expiring, compare expiry and data
+    // If both error, compare error contents
+    // If one is expiring and the other is error, return false
+
     return input -> input.leftResult.match(
         leftExpiring -> input.rightResult.match(
             rightExpiring -> leftExpiring.expiry().equals(rightExpiring.expiry()) && test.test(new CommutativityTestInput<>(
@@ -133,6 +154,8 @@ public final class CellRefV2 {
           name(result, "(%s) and (%s)".formatted(getEffectName(left), getEffectName(right)));
           return result;
         } catch (Throwable e) {
+          // MD: Very broad catch... I wonder if this can cause any problems with replaying tasks, which rely on
+          // exceptions for control flow
           final DynamicsEffect<D> result = $ -> failure(e);
           name(result, "Failed to combine concurrent effects: (%s) and (%s)".formatted(
                   getEffectName(left), getEffectName(right)));

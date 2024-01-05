@@ -73,3 +73,5 @@ If you want to compose two monads, copy the definition of `pure`, `apply`, and `
 like `DynamicsMonad`, and replace the monads you're composing.
 Then, write `distribute` for the two monads you're composing to complete the definition of `join`.
 Finally, use the monad method script to generate all additional methods and overloads.
+
+_MD: Brilliant write-up._

@@ -41,6 +41,7 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
 
   static <D extends Dynamics<?, D>> MutableResource<D> resource(ErrorCatching<Expiring<D>> initial, EffectTrait<DynamicsEffect<D>> effectTrait) {
     MutableResource<D> result = new MutableResource<>() {
+      // MD: It was at this moment that Matt realized that MutableResource is an interface. But why...?
       private final CellRef<DynamicsEffect<D>, Cell<D>> cell = allocate(initial, effectTrait);
 
       @Override
@@ -67,6 +68,8 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     return result;
   }
 
+  // MD: Musing... I wonder if we want to encourage MutableResource to be used by end-users, or by "library" authors.
+  // i.e. does this slot in between `Register` and `Cell`, or does it replace `Register`?
   static <D extends Dynamics<?, D>> void set(MutableResource<D> resource, D newDynamics) {
     resource.emit("Set " + newDynamics, DynamicsMonad.effect(x -> newDynamics));
   }
@@ -103,3 +106,31 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
 final class MutableResourceFlags {
   public static boolean DETECT_BUSY_CELLS = false;
 }
+
+/*
+Add MutableResource
+
+Adds MutableResource and supporting types for defining cells and effects.
+
+This design emphasizes separation of concerns in two primary ways:
+* First, since every resource dynamics carries an expiry and stepping behavior,
+  we don't need to define a different cell type depending on how that value is computed (like an Accumulator)
+  nor by what kind of dynamics are stored (e.g. Discrete vs. Real).
+* Second, since the DynamicsEffect interface defines a fully general effect type,
+  we don't need to define a different cell type depending on the supported class of effects.
+  Taken together, we can define a single cell type.
+
+This design also seeks to reduce overhead for modelers to handle effects the "right" way.
+By this, we mean using semantically correct effects, rather than (ab)using Registers for everything.
+* Instead of defining a new type for effects, we use a general DynamicsEffect interface.
+  We also have the DynamicsMonad.effect method, so effects can be written against the base dynamics type,
+  often as a small in-line lambda.
+* To support these "black-box" effects, we use an "automatic" effect trait by default,
+  which tests concurrent effects for commutativity.
+  Since effects are rarely concurrent in practice, this is performant enough in most use cases.
+  Furthermore, it combines with the error-handling wrapper to bubble-up useful error messages,
+  as well as let independent portions of the simulation continue normally.
+
+Taken together, the above means there's a single "default" way to build a cell,
+which provides enough flexibility and performance for most use cases.
+ */
