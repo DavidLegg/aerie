@@ -42,6 +42,8 @@ import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
+// MD: Mkay, this file will probably need a few hours of poring over.
+
 /**
  * Special methods for setting up a substepping resource solver
  * using linear constraints and arc consistency.

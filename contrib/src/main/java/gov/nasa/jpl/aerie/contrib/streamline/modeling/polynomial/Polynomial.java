@@ -28,6 +28,7 @@ import static org.apache.commons.math3.analysis.polynomials.PolynomialsUtils.shi
 public record Polynomial(double[] coefficients) implements Dynamics<Double, Polynomial> {
 
   // TODO: Add Duration parameter for unit of formal parameter?
+  // MD: Is the convention to provide coefficients from least significant to most significant? Can we document that?
   public static Polynomial polynomial(double... coefficients) {
     int n = coefficients.length;
     if (n == 0) {
@@ -38,6 +39,7 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
       // Any NaN coefficient invalidates the whole polynomial
       if (Double.isNaN(coefficients[m])) return new Polynomial(new double[] { Double.NaN });
       // Infinite coefficients invalidate later terms
+      // MD: Infinite coefficients blow my mind a bit - could you help me understand why they don't invalidate the whole polynomial?
       if (Double.isInfinite(coefficients[m])) {
         n = m + 1;
         break;
@@ -151,6 +153,8 @@ public record Polynomial(double[] coefficients) implements Dynamics<Double, Poly
    * Helper method for other comparison methods.
    * Finds the first time the predicate is true, near the next root of this polynomial.
    */
+  // MD: Why would the expiry be correlated with the roots of this polynomial?
+  // MD: If the predicate returns true before the next root..? Will that expiry be missed?
   private Expiry findExpiryNearRoot(Predicate<Duration> expires) {
     Duration root, start, end;
     try {

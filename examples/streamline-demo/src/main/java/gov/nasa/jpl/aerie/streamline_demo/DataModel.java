@@ -51,6 +51,8 @@ public class DataModel {
     var correctedVolumeA = map(clampedVolumeA, actualRateA, (v, r) -> r.integral(v.extract()));
     var correctedVolumeB = map(clampedVolumeB, actualRateB, (v, r) -> r.integral(v.extract()));
     var correctedVolumeC = map(clampedVolumeC, actualRateC, (v, r) -> r.integral(v.extract()));
+
+    // MD: Why is eraseExpiry necessary here?
     // Use the corrected integral values to set volumes, but erase expiry information in the process to avoid loops:
     forward(eraseExpiry(correctedVolumeA), this.volumeA);
     forward(eraseExpiry(correctedVolumeB), this.volumeB);

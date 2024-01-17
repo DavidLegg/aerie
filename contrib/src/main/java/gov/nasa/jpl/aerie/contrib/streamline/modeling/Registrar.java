@@ -108,9 +108,8 @@ public class Registrar {
     profile = true;
   }
 
-  // MD: This one should probably be profile = false;
   public void clearProfile() {
-    profile = true;
+    profile = false;
   }
 
   public <Value> void discrete(final String name, final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {

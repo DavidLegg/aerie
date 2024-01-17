@@ -26,6 +26,7 @@ public final class Unit {
 
   public static Unit createBase(final String shortName, final String longName, final Dimension dimension) {
     // TODO: Track base units, to detect and prevent collisions
+    // MD: Should this be in a separate PR?
     assert(dimension.isBase());
     return new Unit(dimension, 1, longName, shortName);
   }

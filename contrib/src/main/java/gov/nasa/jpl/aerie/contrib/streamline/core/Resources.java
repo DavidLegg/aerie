@@ -16,10 +16,7 @@ import java.util.stream.Stream;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.neverExpiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
-// MD: Unused imports
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
@@ -241,6 +238,9 @@ public final class Resources {
    *   can cause discrete changes in the result.
    *   For example, imagine a continuous numeric resource R,
    *   and a derived resource S := "R > 0".
+   *
+  // MD: Huh, that's an interesting limitation. Can this be achieved with expiry?
+
    *   If R changes continuously from positive to negative,
    *   then S changes discretely from true to false, *without* an effect.
    *   If used directly, Aerie would not re-sample S at this time.
@@ -259,6 +259,7 @@ public final class Resources {
   // REVIEW: Suggestion from Jonathan Castello to remove this method
   // in favor of allowing resources to report expiry information directly.
   // This would be cleaner and potentially more performant.
+  // MD: What would that look like?
   public static <D extends Dynamics<?, D>> Resource<D> signalling(Resource<D> resource) {
     var cell = resource(discrete(Unit.UNIT));
     name(cell, "Signal for (%s)", resource);
@@ -274,6 +275,7 @@ public final class Resources {
   }
 
   public static <D extends Dynamics<?, D>> Resource<D> shift(Resource<D> resource, Duration interval, D initialDynamics) {
+    // MD: What happens if `interval` is negative?
     var cell = resource(initialDynamics);
     delayedSet(cell, resource.getDynamics(), interval);
     wheneverDynamicsChange(resource, newDynamics ->
