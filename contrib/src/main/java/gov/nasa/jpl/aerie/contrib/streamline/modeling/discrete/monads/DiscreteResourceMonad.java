@@ -6,9 +6,13 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.*;
 import org.apache.commons.lang3.function.TriFunction;
 
+import java.util.Collection;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.name;
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
 
 public final class DiscreteResourceMonad {
@@ -28,6 +32,27 @@ public final class DiscreteResourceMonad {
 
   public static <A> Resource<Discrete<A>> join(Resource<Discrete<Resource<Discrete<A>>>> a) {
     return ResourceMonad.map(ResourceMonad.join(ResourceMonad.map(a, DiscreteResourceMonad::distribute)), DiscreteMonad::join);
+  }
+
+  /**
+   * Efficient resource reduction.
+   * <p>
+   *     Creates a single resource node that applies the reduction operation,
+   *     rather than naively applying a lifted reduction on the resources,
+   *     which would produce a resource node for every resource being reduced.
+   * </p>
+   *
+   * @see ResourceMonad#reduce
+   */
+  public static <A> Resource<Discrete<A>> reduce(Collection<? extends Resource<Discrete<A>>> operands, A identity, BinaryOperator<A> operator) {
+    return ResourceMonad.reduce(operands, DiscreteMonad.pure(identity), DiscreteMonad.map(operator)::apply);
+  }
+
+  /**
+   * Like {@link DiscreteResourceMonad#reduce(Collection, Object, BinaryOperator)}, but names the result.
+   */
+  public static <A> Resource<Discrete<A>> reduce(Collection<? extends Resource<Discrete<A>>> operands, A identity, BinaryOperator<A> operator, String operationName) {
+    return ResourceMonad.reduce(operands, DiscreteMonad.pure(identity), DiscreteMonad.map(operator)::apply, operationName);
   }
 
   // GENERATED CODE START

@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling;
 
+import gov.nasa.jpl.aerie.contrib.metadata.UnitRegistrar;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.IntegerValueMapper;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.NullableValueMapper;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.StringValueMapper;
@@ -117,13 +118,21 @@ public class Registrar {
   }
 
   public void real(final String name, final Resource<Linear> resource) {
+    real(name, resource, null);
+  }
+
+  public void real(final String name, final Resource<Linear> resource, String unit) {
     name(resource, name);
     var debugResource = debug(name, resource);
     gov.nasa.jpl.aerie.merlin.framework.Resource<RealDynamics> registeredResource = switch (errorBehavior) {
       case Log -> () -> realDynamics(currentData(debugResource, linear(0, 0)));
       case Throw -> wrapErrors(name, () -> realDynamics(currentData(debugResource)));
     };
-    baseRegistrar.real(name, registeredResource);
+    if (unit != null) {
+      UnitRegistrar.realResource(baseRegistrar, name, registeredResource, unit);
+    } else {
+      baseRegistrar.real(name, registeredResource);
+    }
     if (errorBehavior.equals(Log)) logErrors(name, debugResource);
   }
 

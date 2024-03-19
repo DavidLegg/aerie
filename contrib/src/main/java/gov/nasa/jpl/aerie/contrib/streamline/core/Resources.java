@@ -304,14 +304,4 @@ public final class Resources {
     addDependency(result, p);
     return result;
   }
-
-  public static <D> Resource<D> reduce(Stream<? extends Resource<D>> operands, Resource<D> identity, BiFunction<Resource<D>, Resource<D>, Resource<D>> operation, String operationName) {
-    return reduce(operands.toList(), identity, operation, operationName);
-  }
-
-  public static <D> Resource<D> reduce(Collection<? extends Resource<D>> operands, Resource<D> identity, BiFunction<Resource<D>, Resource<D>, Resource<D>> operation, String operationName) {
-    var result = operands.stream().reduce(identity, operation, operation::apply);
-    name(result, operationName + argsFormat(operands), operands.toArray());
-    return result;
-  }
 }

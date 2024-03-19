@@ -4,6 +4,10 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Context;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Profiling;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
@@ -26,14 +30,38 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     emit(effect);
   }
 
+  /**
+   * General constructor for {@link MutableResource}.
+   * Before invoking this constructor, see if there are any more-specific constructors available.
+   *
+   * @see DiscreteResources#discreteResource
+   * @see ClockResources#clock
+   * @see PolynomialResources#polynomialResource
+   */
   static <D extends Dynamics<?, D>> MutableResource<D> resource(D initial) {
     return resource(pure(initial));
   }
 
+  /**
+   * General constructor for {@link MutableResource}.
+   * Before invoking this constructor, see if there are any more-specific constructors available.
+   *
+   * @see DiscreteResources#discreteResource
+   * @see ClockResources#clock
+   * @see PolynomialResources#polynomialResource
+   */
   static <D extends Dynamics<?, D>> MutableResource<D> resource(D initial, EffectTrait<DynamicsEffect<D>> effectTrait) {
     return resource(pure(initial), effectTrait);
   }
 
+  /**
+   * General constructor for {@link MutableResource}.
+   * Before invoking this constructor, see if there are any more-specific constructors available.
+   *
+   * @see DiscreteResources#discreteResource
+   * @see ClockResources#clock
+   * @see PolynomialResources#polynomialResource
+   */
   static <D extends Dynamics<?, D>> MutableResource<D> resource(ErrorCatching<Expiring<D>> initial) {
     // Use autoEffects for a generic CellResource, on the theory that most resources
     // have relatively few effects, and even fewer concurrent effects, so this is performant enough.
@@ -41,6 +69,14 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     return resource(initial, autoEffects());
   }
 
+  /**
+   * General constructor for {@link MutableResource}.
+   * Before invoking this constructor, see if there are any more-specific constructors available.
+   *
+   * @see DiscreteResources#discreteResource
+   * @see ClockResources#clock
+   * @see PolynomialResources#polynomialResource
+   */
   static <D extends Dynamics<?, D>> MutableResource<D> resource(ErrorCatching<Expiring<D>> initial, EffectTrait<DynamicsEffect<D>> effectTrait) {
     MutableResource<D> result = new MutableResource<>() {
       private final CellRef<DynamicsEffect<D>, Cell<D>> cell = allocate(initial, effectTrait);

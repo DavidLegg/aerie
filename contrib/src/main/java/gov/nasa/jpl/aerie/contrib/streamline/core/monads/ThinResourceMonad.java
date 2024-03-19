@@ -4,7 +4,9 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.ThinResource;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.*;
 import org.apache.commons.lang3.function.TriFunction;
 
+import java.util.Collection;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
@@ -22,6 +24,20 @@ public final class ThinResourceMonad {
 
   public static <A> ThinResource<A> join(ThinResource<ThinResource<A>> a) {
     return () -> a.getDynamics().getDynamics();
+  }
+
+  /**
+   * Efficient resource reduction.
+   * <p>
+   *     Creates a single resource node that applies the reduction operation,
+   *     rather than naively applying a lifted reduction on the resources,
+   *     which would produce a resource node for every resource being reduced.
+   * </p>
+   *
+   * @see ResourceMonad#reduce
+   */
+  public static <A> ThinResource<A> reduce(Collection<? extends ThinResource<A>> operands, A identity, BinaryOperator<A> operator) {
+    return () -> operands.stream().map(ThinResource::getDynamics).reduce(identity, operator);
   }
 
   // GENERATED CODE START

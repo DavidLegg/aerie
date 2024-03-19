@@ -8,10 +8,14 @@ import gov.nasa.jpl.aerie.contrib.streamline.debugging.Profiling;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.*;
 import org.apache.commons.lang3.function.TriFunction;
 
+import java.util.Collection;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.name;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Profiling.profile;
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
 
@@ -79,6 +83,45 @@ public final class ResourceMonad {
 
   public static <A> Resource<A> pure(ErrorCatching<Expiring<A>> a) {
     return ThinResourceMonad.pure(a)::getDynamics;
+  }
+
+  /**
+   * Efficient resource reduction.
+   * <p>
+   *     Creates a single resource node that applies the reduction operation,
+   *     rather than naively applying a lifted reduction on the resources,
+   *     which would produce a resource node for every resource being reduced.
+   * </p>
+   */
+  public static <A> Resource<A> reduce(Collection<? extends Resource<A>> operands, A identity, BinaryOperator<A> operator) {
+    return reduce(operands, DynamicsMonad.pure(identity), DynamicsMonad.map(operator)::apply);
+  }
+
+  /**
+   * Like {@link ResourceMonad#reduce(Collection, Object, BinaryOperator)}, but also names the result.
+   */
+  public static <A> Resource<A> reduce(Collection<? extends Resource<A>> operands, A identity, BinaryOperator<A> operator, String operationName) {
+    return reduce(operands, DynamicsMonad.pure(identity), DynamicsMonad.map(operator)::apply, operationName);
+  }
+
+  /**
+   * Like {@link ResourceMonad#reduce(Collection, Object, BinaryOperator)}, but allows operator to consider full dynamics
+   * rather than just the base dynamics data.
+   */
+  public static <A> Resource<A> reduce(Collection<? extends Resource<A>> operands, ErrorCatching<Expiring<A>> identity, BinaryOperator<ErrorCatching<Expiring<A>>> operator) {
+    Resource<A> result = ThinResourceMonad.reduce(operands, identity, operator)::getDynamics;
+    for (var operand : operands) {
+      addDependency(result, operand);
+    }
+    if (profileAllResources) result = profile(result);
+    return result;
+  }
+
+  /**
+   * Like {@link ResourceMonad#reduce(Collection, ErrorCatching, BinaryOperator)}, but also names the result.
+   */
+  public static <A> Resource<A> reduce(Collection<? extends Resource<A>> operands, ErrorCatching<Expiring<A>> identity, BinaryOperator<ErrorCatching<Expiring<A>>> operator, String operationName) {
+    return name(reduce(operands, identity, operator), operationName + " " + argsFormat(operands), operands.toArray());
   }
 
   // GENERATED CODE START

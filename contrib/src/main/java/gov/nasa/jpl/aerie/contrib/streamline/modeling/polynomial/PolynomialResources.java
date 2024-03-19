@@ -5,6 +5,8 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ThinResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.*;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
@@ -22,10 +24,10 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.testing;
@@ -254,11 +256,11 @@ public final class PolynomialResources {
    */
   @SafeVarargs
   public static Resource<Polynomial> add(Resource<Polynomial>... summands) {
-    return sum(stream(summands));
+    return sum(stream(summands).toList());
   }
 
-  public static Resource<Polynomial> sum(Stream<? extends Resource<Polynomial>> summands) {
-    return reduce(summands, constant(0), map(Polynomial::add), "Sum");
+  public static Resource<Polynomial> sum(Collection<? extends Resource<Polynomial>> summands) {
+    return reduce(summands, polynomial(0), Polynomial::add, "Sum");
   }
 
   /**
@@ -288,14 +290,14 @@ public final class PolynomialResources {
    */
   @SafeVarargs
   public static Resource<Polynomial> multiply(Resource<Polynomial>... factors) {
-    return product(stream(factors));
+    return product(stream(factors).toList());
   }
 
   /**
    * Multiply polynomial resources.
    */
-  public static Resource<Polynomial> product(Stream<? extends Resource<Polynomial>> factors) {
-    return reduce(factors, constant(1), map(Polynomial::multiply), "Product");
+  public static Resource<Polynomial> product(Collection<? extends Resource<Polynomial>> factors) {
+    return reduce(factors, polynomial(1), Polynomial::multiply, "Product");
   }
 
   /**
@@ -504,29 +506,35 @@ public final class PolynomialResources {
 
   @SafeVarargs
   public static Resource<Polynomial> min(Resource<Polynomial>... args) {
-    return min(stream(args));
+    return min(stream(args).toList());
   }
 
-  public static Resource<Polynomial> min(Stream<Resource<Polynomial>> args) {
-    return signalling(reduce(args, constant(Double.POSITIVE_INFINITY), bind((p, q) -> pure(p.min(q))), "Min"));
+  public static Resource<Polynomial> min(Collection<Resource<Polynomial>> args) {
+    return signalling(reduce(
+            args,
+            DynamicsMonad.pure(polynomial(Double.POSITIVE_INFINITY)),
+            DynamicsMonad.bind((Polynomial p, Polynomial q) -> ErrorCatchingMonad.pure(p.min(q)))::apply,
+            "Min"));
   }
 
   @SafeVarargs
   public static Resource<Polynomial> max(Resource<Polynomial>... args) {
-    return max(stream(args));
+    return max(stream(args).toList());
   }
 
-  public static Resource<Polynomial> max(Stream<Resource<Polynomial>> args) {
-    return signalling(reduce(args, constant(Double.NEGATIVE_INFINITY), bind((p, q) -> pure(p.max(q))), "Max"));
+  public static Resource<Polynomial> max(Collection<Resource<Polynomial>> args) {
+    return signalling(reduce(
+            args,
+            DynamicsMonad.pure(polynomial(Double.NEGATIVE_INFINITY)),
+            DynamicsMonad.bind((Polynomial p, Polynomial q) -> ErrorCatchingMonad.pure(p.max(q)))::apply,
+            "Max"));
   }
 
   /**
    * Absolute value
    */
   public static Resource<Polynomial> abs(Resource<Polynomial> p) {
-    var result = max(p, negate(p));
-    name(result, "| %s |", p);
-    return result;
+    return name(max(p, negate(p)), "| %s |", p);
   }
 
   /**
@@ -571,18 +579,18 @@ public final class PolynomialResources {
    */
   @SafeVarargs
   public static UnitAware<Resource<Polynomial>> add(UnitAware<? extends Resource<Polynomial>>... summands) {
-    if (summands.length == 0) {
-      throw new IllegalArgumentException("Cannot perform unit-aware addition of zero arguments.");
-    }
-    final Unit unit = summands[0].unit();
-    return unitAware(sum(stream(summands).map(r -> r.value(unit))), unit);
+    return sum$(stream(summands).toList());
   }
 
   /**
    * Add polynomial resources.
    */
-  public static UnitAware<Resource<Polynomial>> sum$(Stream<UnitAware<? extends Resource<Polynomial>>> summands) {
-    return add(summands.<UnitAware<? extends Resource<Polynomial>>>toArray(UnitAware[]::new));
+  public static UnitAware<Resource<Polynomial>> sum$(Collection<UnitAware<? extends Resource<Polynomial>>> summands) {
+    final Unit unit = summands.stream()
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Cannot perform unit-aware addition of zero arguments."))
+            .unit();
+    return unitAware(sum(summands.stream().map(r -> r.value(unit)).toList()), unit);
   }
 
   /**
@@ -599,16 +607,16 @@ public final class PolynomialResources {
    */
   @SafeVarargs
   public static UnitAware<Resource<Polynomial>> multiply(UnitAware<? extends Resource<Polynomial>>... factors) {
-    return unitAware(
-        product(stream(factors).map(UnitAware::value)),
-        stream(factors).map(UnitAware::unit).reduce(Unit.SCALAR, Unit::multiply));
+    return product$(stream(factors).toList());
   }
 
   /**
    * Multiply polynomial resources.
    */
-  public static UnitAware<Resource<Polynomial>> product$(Stream<UnitAware<? extends Resource<Polynomial>>> factors) {
-    return multiply(factors.<UnitAware<? extends Resource<Polynomial>>>toArray(UnitAware[]::new));
+  public static UnitAware<Resource<Polynomial>> product$(Collection<UnitAware<? extends Resource<Polynomial>>> factors) {
+    return unitAware(
+            product(factors.stream().map(UnitAware::value).toList()),
+            factors.stream().map(UnitAware::unit).reduce(Unit.SCALAR, Unit::multiply));
   }
 
   /**

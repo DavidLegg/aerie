@@ -1,6 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.debugging;
 
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.apache.commons.lang3.stream.Streams;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -85,6 +86,6 @@ public final class Naming {
   }
 
   public static String argsFormat(Collection<?> collection) {
-    return "(" + IntStream.range(0, collection.size()).mapToObj($ -> "%s").collect(Collectors.joining(", ")) + ")";
+    return "(" + collection.stream().map($ -> "%s").collect(Collectors.joining(", ")) + ")";
   }
 }

@@ -47,24 +47,25 @@ public final class DiscreteResources {
     return result;
   }
 
-  // General discrete cell resource constructor
+  /**
+   * Constructor for discrete mutable resources.
+   *
+   * <p>
+   *     Note that this has special handling for double-valued discrete resources,
+   *     which need toleranced equality checks for detecting commuting effects.
+   * </p>
+   */
   public static <T> MutableResource<Discrete<T>> discreteResource(T initialValue) {
-    return resource(discrete(initialValue));
-  }
-
-  // Annoyingly, we need to repeat the specialization for integer resources, so that
-  // discreteMutableResource(42) doesn't become a double resource, due to the next overload
-  public static MutableResource<Discrete<Integer>> discreteResource(int initialValue) {
-    return resource(discrete(initialValue));
-  }
-
-  // specialized constructor for doubles, because they require a toleranced equality comparison
-  public static MutableResource<Discrete<Double>> discreteResource(double initialValue) {
-    return resource(discrete(initialValue), autoEffects(testing(
-        (CommutativityTestInput<Discrete<Double>> input) -> DoubleUtils.areEqualResults(
-            input.original().extract(),
-            input.leftResult().extract(),
-            input.rightResult().extract()))));
+    if (initialValue instanceof Double) {
+      // Safety - Since T extends Double and Double is final, T = Double, so the cast below is safe.
+      return resource(discrete(initialValue), autoEffects(testing(
+              (CommutativityTestInput<Discrete<T>> input) -> DoubleUtils.areEqualResults(
+                      (double) input.original().extract(),
+                      (double) input.leftResult().extract(),
+                      (double) input.rightResult().extract()))));
+    } else {
+      return resource(discrete(initialValue));
+    }
   }
 
   /**
@@ -189,9 +190,7 @@ public final class DiscreteResources {
    */
   public static Resource<Discrete<Boolean>> and(Resource<Discrete<Boolean>> left, Resource<Discrete<Boolean>> right) {
     // Short-circuiting and: Only gets right if left is true
-    var result = choose(left, right, constant(false));
-    name(result, "(%s) and (%s)", left, right);
-    return result;
+    return name(choose(left, right, constant(false)), "(%s) and (%s)", left, right);
   }
 
   /**
@@ -199,15 +198,35 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Boolean>> all(Resource<Discrete<Boolean>>... operands) {
-    return all(stream(operands));
+    return all(stream(operands).toList());
   }
 
   /**
    * Reduce operands using short-circuiting logical "and"
    */
-  public static Resource<Discrete<Boolean>> all(Stream<? extends Resource<Discrete<Boolean>>> operands) {
-    // Reduce using the short-circuiting and to improve efficiency
-    return reduce(operands, constant(true), DiscreteResources::and, "All");
+  public static Resource<Discrete<Boolean>> all(Collection<? extends Resource<Discrete<Boolean>>> operands) {
+    // Special-case of a special-case - this resource is both short-circuiting and a single-layer reduction.
+    // Since "DiscreteResources.choose" and "ResourceMonad.reduce" each handle only one of these special cases,
+    // this is hand-crafted at the resource level, only using monads to handle dynamics.
+    Resource<Discrete<Boolean>> result = () -> {
+      var resultDynamics = DiscreteDynamicsMonad.pure(true);
+      for (var operand : operands) {
+        resultDynamics = DiscreteDynamicsMonad.map(resultDynamics, operand.getDynamics(), Boolean::logicalAnd);
+        if (!value(resultDynamics, false)) {
+          // If value is either false or an error, short-circuit out.
+          // Interestingly, this means we could expire after a later operand,
+          // if that later operand doesn't currently contribute to the "false" answer!
+          break;
+        }
+      }
+      return resultDynamics;
+    };
+    name(result, "All " + argsFormat(operands), operands.toArray());
+    for (Resource<Discrete<Boolean>> operand : operands) {
+      addDependency(result, operand);
+    }
+    // TODO - this resource will not be profiled! Close this gap in data collection...
+    return result;
   }
 
   /**
@@ -225,15 +244,35 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Boolean>> any(Resource<Discrete<Boolean>>... operands) {
-    return any(stream(operands));
+    return any(stream(operands).toList());
   }
 
   /**
    * Reduce operands using short-circuiting logical "or"
    */
-  public static Resource<Discrete<Boolean>> any(Stream<? extends Resource<Discrete<Boolean>>> operands) {
-    // Reduce using the short-circuiting or to improve efficiency
-    return reduce(operands, constant(false), DiscreteResources::or, "Any");
+  public static Resource<Discrete<Boolean>> any(Collection<? extends Resource<Discrete<Boolean>>> operands) {
+    // Special-case of a special-case - this resource is both short-circuiting and a single-layer reduction.
+    // Since "DiscreteResources.choose" and "ResourceMonad.reduce" each handle only one of these special cases,
+    // this is hand-crafted at the resource level, only using monads to handle dynamics.
+    Resource<Discrete<Boolean>> result = () -> {
+      var resultDynamics = DiscreteDynamicsMonad.pure(false);
+      for (var operand : operands) {
+        resultDynamics = DiscreteDynamicsMonad.map(resultDynamics, operand.getDynamics(), Boolean::logicalAnd);
+        if (value(resultDynamics, false)) {
+          // If value is either true or an error, short-circuit out.
+          // Interestingly, this means we could expire after a later operand,
+          // if that later operand doesn't currently contribute to the "true" answer!
+          break;
+        }
+      }
+      return resultDynamics;
+    };
+    name(result, "Any " + argsFormat(operands), operands.toArray());
+    for (Resource<Discrete<Boolean>> operand : operands) {
+      addDependency(result, operand);
+    }
+    // TODO - this resource will not be profiled! Close this gap in data collection...
+    return result;
   }
 
   /**
@@ -278,14 +317,14 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Integer>> addInt(Resource<Discrete<Integer>>... operands) {
-    return sumInt(Arrays.stream(operands));
+    return sumInt(stream(operands).toList());
   }
 
   /**
    * Add integer resources
    */
-  public static Resource<Discrete<Integer>> sumInt(Stream<? extends Resource<Discrete<Integer>>> operands) {
-    return reduce(operands, constant(0), map(Integer::sum), "Sum");
+  public static Resource<Discrete<Integer>> sumInt(Collection<? extends Resource<Discrete<Integer>>> operands) {
+    return reduce(operands, 0, Integer::sum, "Sum");
   }
 
   /**
@@ -302,14 +341,14 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Integer>> multiplyInt(Resource<Discrete<Integer>>... operands) {
-    return productInt(Arrays.stream(operands));
+    return productInt(stream(operands).toList());
   }
 
   /**
    * Multiply integer resources
    */
-  public static Resource<Discrete<Integer>> productInt(Stream<? extends Resource<Discrete<Integer>>> operands) {
-    return reduce(operands, constant(1), map((x, y) -> x * y), "Product");
+  public static Resource<Discrete<Integer>> productInt(Collection<? extends Resource<Discrete<Integer>>> operands) {
+    return reduce(operands, 1, (x, y) -> x * y, "Product");
   }
 
   /**
@@ -328,14 +367,14 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Double>> add(Resource<Discrete<Double>>... operands) {
-    return sum(Arrays.stream(operands));
+    return sum(stream(operands).toList());
   }
 
   /**
    * Add double resources
    */
-  public static Resource<Discrete<Double>> sum(Stream<? extends Resource<Discrete<Double>>> operands) {
-    return reduce(operands, constant(0.0), map(Double::sum), "Sum");
+  public static Resource<Discrete<Double>> sum(Collection<? extends Resource<Discrete<Double>>> operands) {
+    return reduce(operands, 0.0, Double::sum, "Sum");
   }
 
   /**
@@ -352,14 +391,14 @@ public final class DiscreteResources {
    */
   @SafeVarargs
   public static Resource<Discrete<Double>> multiply(Resource<Discrete<Double>>... operands) {
-    return product(Arrays.stream(operands));
+    return product(stream(operands).toList());
   }
 
   /**
    * Multiply double resources
    */
-  public static Resource<Discrete<Double>> product(Stream<? extends Resource<Discrete<Double>>> operands) {
-    return reduce(operands, constant(1.0), map((x, y) -> x * y), "Product");
+  public static Resource<Discrete<Double>> product(Collection<? extends Resource<Discrete<Double>>> operands) {
+    return reduce(operands, 1.0, (x, y) -> x * y, "Product");
   }
 
   /**

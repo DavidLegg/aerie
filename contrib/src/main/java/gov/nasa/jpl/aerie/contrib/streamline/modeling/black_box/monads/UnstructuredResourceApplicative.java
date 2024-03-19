@@ -6,9 +6,13 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.Unstructured;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.*;
 import org.apache.commons.lang3.function.TriFunction;
 
+import java.util.Collection;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.argsFormat;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.name;
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
 
 /**
@@ -24,6 +28,27 @@ public final class UnstructuredResourceApplicative {
 
     public static <A, B> Resource<Unstructured<B>> apply(Resource<Unstructured<A>> a, Resource<Unstructured<Function<A, B>>> f) {
         return ResourceMonad.apply(a, ResourceMonad.map(f, UnstructuredMonad::apply));
+    }
+
+    /**
+     * Efficient resource reduction.
+     * <p>
+     *     Creates a single resource node that applies the reduction operation,
+     *     rather than naively applying a lifted reduction on the resources,
+     *     which would produce a resource node for every resource being reduced.
+     * </p>
+     *
+     * @see ResourceMonad#reduce
+     */
+    public static <A> Resource<Unstructured<A>> reduce(Collection<? extends Resource<Unstructured<A>>> operands, A identity, BinaryOperator<A> operator) {
+        return ResourceMonad.reduce(operands, UnstructuredMonad.pure(identity), UnstructuredMonad.map(operator)::apply);
+    }
+
+    /**
+     * Like {@link UnstructuredResourceApplicative#reduce(Collection, Object, BinaryOperator)}, but names the result.
+     */
+    public static <A> Resource<Unstructured<A>> reduce(Collection<? extends Resource<Unstructured<A>>> operands, A identity, BinaryOperator<A> operator, String operationName) {
+        return ResourceMonad.reduce(operands, UnstructuredMonad.pure(identity), UnstructuredMonad.map(operator)::apply, operationName);
     }
 
     // Unstructured<Resource<A>> has a success status and expiry that can vary with time, as the dynamics are stepped forward.
