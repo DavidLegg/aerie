@@ -2,6 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -28,6 +29,10 @@ public sealed interface ErrorCatching<T> {
         e -> {
           throw new RuntimeException(e);
         });
+  }
+
+  default Optional<T> asOptional() {
+    return match(Optional::of, $ -> Optional.empty());
   }
 
   record Success<T>(T result) implements ErrorCatching<T> {

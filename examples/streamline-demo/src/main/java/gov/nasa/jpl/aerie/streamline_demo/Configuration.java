@@ -16,4 +16,9 @@ public final class Configuration {
   @Parameter
   public Duration profilingDumpTime = Duration.ZERO;
 
+  @Parameter
+  public double oscillatorFrequencyHz = 0.1;
+
+  @Parameter
+  public int oscillatorTimeStepMillis = 100;
 }

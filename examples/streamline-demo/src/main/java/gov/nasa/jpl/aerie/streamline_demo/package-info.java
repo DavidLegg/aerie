@@ -7,6 +7,8 @@
 @WithActivityType(ChangeDesiredRate.class)
 @WithActivityType(CauseError.class)
 @WithActivityType(ChangeApproximationInput.class)
+@WithActivityType(MoveTarget.class)
+@WithActivityType(ApplyDamper.class)
 
 package gov.nasa.jpl.aerie.streamline_demo;
 
