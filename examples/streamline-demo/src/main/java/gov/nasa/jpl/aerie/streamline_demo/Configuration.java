@@ -16,4 +16,6 @@ public final class Configuration {
   @Parameter
   public Duration profilingDumpTime = Duration.ZERO;
 
+  @Parameter
+  public long seed = 0;
 }
