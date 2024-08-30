@@ -2,10 +2,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.random;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * Helper for constructing {@link ProbabilityDistribution}s.
@@ -17,12 +14,12 @@ import java.util.TreeMap;
  * </p>
  */
 public final class ProbabilityDistributionFactory {
-    // This parent RNG *must* be split whenever we create a new distribution.
-    // That way, each distribution we create is independent.
-    private final AerieRandom rng;
+    // We *can't* use an AerieRandom here, because we need to run it during initialization.
+    // Since AerieRandom emits cell effects when run, it *can't* be used during initialization.
+    private final Random rng;
 
-    public ProbabilityDistributionFactory(AerieRandom rng) {
-        this.rng = rng;
+    public ProbabilityDistributionFactory(long seed) {
+        this.rng = new Random(seed);
     }
 
     /**
@@ -37,13 +34,17 @@ public final class ProbabilityDistributionFactory {
      * </p>
      */
     public ProbabilityDistributionFactory split() {
-        return new ProbabilityDistributionFactory(rng.split());
+        return new ProbabilityDistributionFactory(rng.nextLong());
+    }
+
+    private AerieRandom aerieRandom() {
+        return new AerieRandom(rng.nextLong());
     }
 
     public <T> ProbabilityDistribution<T> uniform(Collection<T> values) {
         // Fix the values in case the collection we're given ever changes.
         var fixedValues = new ArrayList<>(values);
-        var myRng = rng.split();
+        var myRng = aerieRandom();
         return () -> fixedValues.get(myRng.nextInt(fixedValues.size()));
     }
 
@@ -62,12 +63,12 @@ public final class ProbabilityDistributionFactory {
     }
 
     public ProbabilityDistribution<Double> uniform(double min, double max) {
-        var myRng = rng.split();
+        var myRng = aerieRandom();
         return () -> myRng.nextDouble(min, max);
     }
 
     public ProbabilityDistribution<Double> gaussian(double mean, double stddev) {
-        var myRng = rng.split();
+        var myRng = aerieRandom();
         return () -> myRng.nextGaussian(mean, stddev);
     }
 }

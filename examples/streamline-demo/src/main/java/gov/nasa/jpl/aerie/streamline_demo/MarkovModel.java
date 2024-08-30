@@ -22,7 +22,7 @@ public class MarkovModel {
         // NOTE - I'm constructing the distribution factory right here, and immediately using it.
         // In a "real" model, you'd want to construct one factory at the top level
         // and give a split() of that to each sub-model, to ensure deterministic-but-(pseudo)independent randomness.
-        var factory = new ProbabilityDistributionFactory(new AerieRandom(config.seed));
+        var factory = new ProbabilityDistributionFactory(config.seed);
         var process = new MarkovProcess<>(MMState.A, Map.of(
                 MMState.A, List.of(Pair.of(MMState.A, 0.6), Pair.of(MMState.B, 0.4)),
                 MMState.B, List.of(Pair.of(MMState.A, 0.7), Pair.of(MMState.B, 0.3))),
