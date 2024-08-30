@@ -4,9 +4,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.set;
@@ -18,7 +16,8 @@ public class MarkovProcess<T> {
     public final MutableResource<Discrete<T>> state;
     private final Map<T, ProbabilityDistribution<T>> transitionDistributions;
 
-    public MarkovProcess(T initialState, Map<T, Collection<Pair<T, Double>>> weightedTransitionTable, ProbabilityDistributionFactory distributionFactory) {
+    // The SortedMap is required to give a deterministic iteration order, since that affects the seeding of the RNGs.
+    public MarkovProcess(T initialState, SortedMap<T, Collection<Pair<T, Double>>> weightedTransitionTable, ProbabilityDistributionFactory distributionFactory) {
         state = discreteResource(initialState);
         transitionDistributions = new HashMap<>();
         weightedTransitionTable.forEach((state, transitions) ->

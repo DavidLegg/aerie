@@ -14,12 +14,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.$enum;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.every;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Logging.LOGGER;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.UnstructuredResources.approximateAsLinear;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.UnstructuredResources.asUnstructured;
@@ -42,9 +42,9 @@ public class MarkovModel {
         // In a "real" model, you'd want to construct one factory at the top level
         // and give a split() of that to each sub-model, to ensure deterministic-but-(pseudo)independent randomness.
         var factory = new ProbabilityDistributionFactory(config.seed);
-        var process = new MarkovProcess<>(MMState.A, Map.of(
+        var process = new MarkovProcess<>(MMState.A, new TreeMap<>(Map.of(
                 MMState.A, List.of(Pair.of(MMState.A, 0.6), Pair.of(MMState.B, 0.4)),
-                MMState.B, List.of(Pair.of(MMState.A, 0.7), Pair.of(MMState.B, 0.3))),
+                MMState.B, List.of(Pair.of(MMState.A, 0.7), Pair.of(MMState.B, 0.3)))),
                 factory);
         state = process.state;
         registrar.discrete("markov/state", state, $enum(MMState.class));
@@ -54,10 +54,10 @@ public class MarkovModel {
         // every(Duration.MINUTE, process::transition);
         // The version above will work if we just want to drive the markov process itself.
         // The version below allows us to also use the reported transition to do something else:
-        every(Duration.MINUTE, () -> {
-            var transition = process.transition();
-            LOGGER.info("Markov Transition: %s -> %s", transition.startState(), transition.endState());
-        });
+         every(Duration.MINUTE, () -> {
+             var transition = process.transition();
+             LOGGER.info("Markov Transition: %s -> %s", transition.startState(), transition.endState());
+         });
 
         // Alternatively, we could monitor the state resource itself to react to specific changes.
         // For example, here's one way we might record the cumulative time we spend in each state.
@@ -66,11 +66,9 @@ public class MarkovModel {
             var timer = resource(pausedStopwatch());
             var processInMMState = DiscreteResources.equals(state, constant(mmState));
             whenever(processInMMState, () -> {
-                LOGGER.debug("State %s START -- time = %s", mmState, currentValue(timer));
                 start(timer);
                 waitUntil(when(not(processInMMState)));
                 pause(timer);
-                LOGGER.debug("State %s STOP -- time = %s", mmState, currentValue(timer));
             });
             cumulativeTimeInState.put(mmState, timer);
             registrar.real("markov/cumulativeHours/" + mmState, asLinear(timer, Duration.HOURS));
