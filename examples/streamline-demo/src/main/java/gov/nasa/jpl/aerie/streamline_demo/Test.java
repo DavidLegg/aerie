@@ -14,6 +14,7 @@ import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.every;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.whenever;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
@@ -131,5 +132,33 @@ public class Test<T> {
 
     static <T> Supplier<T> constant$(T value) {
         return () -> value;
+    }
+
+
+
+    {
+        onceWhenever(fixedDuration(HOUR), () -> {});
+        new Event(fixedDuration(HOUR), () -> {});
+        new Event(randomDuration(...), () -> {});
+        new Event(threshold(p, Comparison.greaterThan(), q), () -> {});
+    }
+
+    class Event {
+        private final Supplier<Condition> conditionSupplier;
+        private final Runnable task;
+
+        private boolean started = false;
+
+        public Event(Supplier<Condition> conditionSupplier, Runnable task) {
+            this.conditionSupplier = conditionSupplier;
+            this.task = task;
+        }
+
+        public void start() {
+            if (!started) {
+                onceWhenever(conditionSupplier, task);
+                started = true;
+            }
+        }
     }
 }
