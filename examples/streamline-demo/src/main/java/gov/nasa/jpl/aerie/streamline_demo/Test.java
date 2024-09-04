@@ -25,7 +25,6 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.HOUR;
 public class Test<T> {
 
     {
-        ProbabilityDistribution<Boolean> always = () -> true;
 
         // For this project, I build up the randomness like so:
         var factory = new ProbabilityDistributionFactory(123);
@@ -37,20 +36,23 @@ public class Test<T> {
         // Using some of the example methods defined below.
 
         // Every hour, flip a coin, if heads, then
-        runEvent(fixedDuration(HOUR), coinFlip, () -> { /* ... */ });
+        /* ... */
+        onceWhenever(fixedDuration(HOUR), conditional(coinFlip, () -> { /* ... */ }));
         // Below, we say that this event happens at interval lengths normally distributed about 2 hours:
         // I guess in theory you'd want to clamp the distribution at 0... Not sure if it actually matters, though.
-        runEvent(randomDuration(factory.gaussian(2, 0.5).map(t -> Duration.roundNearest(t, HOUR))),
-                always,
-                () -> { /* ... */ });
+        /* ... */
+        Supplier<Condition> trigger2 = randomDuration(factory.gaussian(2, 0.5).map(t -> Duration.roundNearest(t, HOUR)));
+        // Instead of conditioning this task with a trivial always-true distribution, we can just *not* use the conditional call.
+        onceWhenever(trigger2, () -> { /* ... */ });
 
         Resource<Discrete<Boolean>> somethingInteresting = discreteResource(false);
         Resource<Discrete<Double>> probability = discreteResource(0.2);
         // Here, we have a boolean state saying when to try,
         // combined with a probability that can change over the course of the simulation.
-        runEvent(booleanState(somethingInteresting),
-                factory.uniform(0, 1).map(x -> x < currentValue(probability)),
-                () -> { /* ... */ });
+        /* ... */
+        Supplier<Condition> trigger1 = booleanState(somethingInteresting);
+        ProbabilityDistribution<Boolean> condition = factory.uniform(0, 1).map(x -> x < currentValue(probability));
+        onceWhenever(trigger1, conditional(condition, () -> { /* ... */ }));
 
         Resource<Discrete<Integer>> p = discreteResource(12);
         Resource<Discrete<Integer>> q = discreteResource(15);
@@ -63,17 +65,9 @@ public class Test<T> {
         // Finally, for a very contrived example, we have an event that triggers whenever p goes above q,
         // with a probability of happening equal to the probability that any of (p - q) bernoulli trials succeed.
         // Yes, there are far better ways to sample such a probability, but suppose you didn't know that?
-        runEvent(threshold(p, Comparison.greaterThan(), q), XtoDelta, () -> { /* ... */ });
-    }
-
-    static void runEvent(Supplier<Condition> trigger, ProbabilityDistribution<Boolean> condition, Runnable task) {
-        whenever(trigger, () -> {
-            if (condition.sample()) {
-                task.run();
-            }
-            // Wait until the trigger is false again, lest we loop tightly on a single iteration.
-            waitUntil(trigger.get().not());
-        });
+        /* ... */
+        Supplier<Condition> trigger = threshold(p, Comparison.greaterThan(), q);
+        onceWhenever(trigger, conditional(XtoDelta, () -> { /* ... */ }));
     }
 
     /**
@@ -85,6 +79,14 @@ public class Test<T> {
             task.run();
             waitUntil(trigger.get().not());
         });
+    }
+
+    static Runnable conditional(ProbabilityDistribution<Boolean> condition, Runnable task) {
+        return () -> {
+            if (condition.sample()) {
+                task.run();
+            }
+        };
     }
 
     static Condition after(Duration time) {
