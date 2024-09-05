@@ -1,7 +1,5 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.random;
 
-import java.util.function.Function;
-
 /**
  * A probability distribution over values of type T.
  * <p>
@@ -13,8 +11,4 @@ import java.util.function.Function;
  */
 public interface ProbabilityDistribution<T> {
     T sample();
-
-    default <S> ProbabilityDistribution<S> map(Function<T, S> f) {
-        return () -> f.apply(sample());
-    }
 }

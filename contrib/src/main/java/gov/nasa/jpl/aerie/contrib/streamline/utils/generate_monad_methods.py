@@ -24,6 +24,9 @@ TARGETS = [
     monad('Unstructured<{}>', '../modeling/black_box/monads/UnstructuredMonad.java'),
     applicative('Resource<Unstructured<{}>>', '../modeling/black_box/monads/UnstructuredResourceApplicative.java'),
     applicative('ErrorCatching<Expiring<Unstructured<{}>>>', '../modeling/black_box/monads/UnstructuredDynamicsApplicative.java'),
+    monad('ProbabilityDistribution<{}>', '../modeling/random/monads/ProbabilityDistributionMonad.java'),
+    monad('Resource<Discrete<ProbabilityDistribution<{}>>>', '../modeling/random/monads/DiscreteResourceDistributionMonad.java'),
+    applicative('Resource<Unstructured<ProbabilityDistribution<{}>>>', '../modeling/random/monads/UnstructuredResourceDistributionApplicative.java'),
 ]
 
 
