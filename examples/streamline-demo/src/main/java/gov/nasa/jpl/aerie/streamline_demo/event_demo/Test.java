@@ -1,16 +1,14 @@
-package gov.nasa.jpl.aerie.streamline_demo;
+package gov.nasa.jpl.aerie.streamline_demo.event_demo;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Reactions;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.Unstructured;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.UnstructuredResources;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.monads.UnstructuredResourceApplicative;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.random.ProbabilityDistribution;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.random.ProbabilityDistributionFactory;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.random.monads.ProbabilityDistributionMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.random.monads.UnstructuredResourceDistributionApplicative;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;

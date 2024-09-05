@@ -107,9 +107,7 @@ public final class DiscreteEffects {
 
   /**
    * Remove an element from the front of the queue resource.
-   * <p>
-   *   Returns that element, or empty if the queue was already empty.
-   * </p>
+   * @return that element, or empty if the queue was already empty.
    */
   public static <T> Optional<T> remove(MutableResource<Discrete<List<T>>> resource) {
     final var currentQueue = currentValue(resource);
@@ -125,6 +123,25 @@ public final class DiscreteEffects {
       return q$;
     }), "Remove %s from queue", result));
     return Optional.of(result);
+  }
+
+  /**
+   * Remove the first occurrence of the specified element from the queue resource, if it is present.
+   * @return true if the queue resource contained element
+   */
+  public static <T> boolean remove(MutableResource<Discrete<List<T>>> resource, T element) {
+    final var currentQueue = currentValue(resource);
+    final boolean result = currentQueue.contains(element);
+
+    resource.emit(name(effect(q -> {
+      var q$ = new LinkedList<>(q);
+      boolean purportedResult = q$.remove(element);
+      if (result != purportedResult) {
+        throw new IllegalStateException("Detected effect conflicting with queue remove operation");
+      }
+      return q$;
+    }), "Remove %s from queue", element));
+    return result;
   }
 
   // Consumable style operations
