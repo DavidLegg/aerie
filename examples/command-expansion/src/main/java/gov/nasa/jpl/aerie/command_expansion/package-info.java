@@ -4,15 +4,26 @@
 
 @WithMappers(BasicValueMappers.class)
 
+// Planning activities
+@WithActivityType(Warm_Up.class)
+@WithActivityType(Do_Observation_Shallow.class)
+@WithActivityType(Do_Observation_Moderate.class)
+@WithActivityType(Do_Observation_Deep.class)
+
+// Command activities
+@WithActivityType(CMD_NO_OP.class)
 @WithActivityType(PWR_Turn_On_Heater.class)
 @WithActivityType(PWR_Turn_Off_Heater.class)
-@WithActivityType(Warm_Up.class)
+@WithActivityType(SCI_Do_Observation_Moderate.class)
+@WithActivityType(SCI_Do_Observation_Deep.class)
+@WithActivityType(SCI_Warm_Up_Moderate.class)
+@WithActivityType(SCI_Warm_Up_Deep.class)
 
 package gov.nasa.jpl.aerie.command_expansion;
 
-import gov.nasa.jpl.aerie.command_expansion.command_activities.PWR_Turn_Off_Heater;
-import gov.nasa.jpl.aerie.command_expansion.command_activities.PWR_Turn_On_Heater;
+import gov.nasa.jpl.aerie.command_expansion.command_activities.*;
 import gov.nasa.jpl.aerie.command_expansion.model.Mission;
+import gov.nasa.jpl.aerie.command_expansion.planning_activities.*;
 import gov.nasa.jpl.aerie.command_expansion.planning_activities.Warm_Up;
 import gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers;
 import gov.nasa.jpl.aerie.merlin.framework.annotations.MissionModel;

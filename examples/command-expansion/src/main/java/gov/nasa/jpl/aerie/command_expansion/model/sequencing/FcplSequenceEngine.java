@@ -1,12 +1,13 @@
 package gov.nasa.jpl.aerie.command_expansion.model.sequencing;
 
+import gov.nasa.jpl.aerie.command_expansion.command_activities.Command;
 import gov.nasa.jpl.aerie.command_expansion.expansion.Sequence;
 import gov.nasa.jpl.aerie.command_expansion.expansion.TimedCommand;
 import gov.nasa.jpl.aerie.command_expansion.model.Mission;
+import gov.nasa.jpl.aerie.command_expansion.util.TimeCondition;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.VariableClock;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
@@ -15,11 +16,9 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Logging.LOGGER;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.VariableClock.pausedStopwatch;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.VariableClockResources.greaterThanOrEquals;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad.map;
@@ -32,7 +31,6 @@ public class FcplSequenceEngine {
     public final String engineId;
     private final Mission mission;
 
-    // TODO - we probably want to expose at least some of these resources (as read-only, not Mutable) through getters
     private final MutableResource<Discrete<Boolean>> active;
     private final MutableResource<Discrete<Optional<Instant>>> epoch;
     private final MutableResource<Discrete<Optional<Sequence>>> loadedSequence;
@@ -42,14 +40,14 @@ public class FcplSequenceEngine {
     private final Resource<Discrete<Optional<TimedCommand>>> nextCommand;
     private final Resource<Discrete<String>> nextCommandStem;
 
-    private final MutableResource<Discrete<Integer>> currentCommandIndex;
-    private final Resource<Discrete<Optional<TimedCommand>>> currentCommand;
-    private final Resource<Discrete<String>> currentCommandStem;
+    private final MutableResource<Discrete<Integer>> lastDispatchedCommandIndex;
+    private final Resource<Discrete<Optional<TimedCommand>>> lastDispatchedCommand;
+    private final Resource<Discrete<String>> lastDispatchedCommandStem;
 
     private final MutableResource<Discrete<Integer>> sequenceLoadCounter;
     private final MutableResource<Discrete<Integer>> commandDispatchCounter;
     private final MutableResource<Discrete<Boolean>> currentCommandComplete;
-    private final MutableResource<VariableClock> timeSinceLastDispatch;
+    private final MutableResource<Discrete<Duration>> timeOfLastDispatch;
     private final Condition readyToDispatch;
 
     public FcplSequenceEngine(String engineId, Registrar registrar, Mission mission) {
@@ -63,50 +61,36 @@ public class FcplSequenceEngine {
         loadedSequenceId = map(loadedSequence, seq -> seq.map(Sequence::seqId).orElse(""));
         nextCommandIndex = discreteResource(0);
         nextCommand = map(loadedSequence, nextCommandIndex, (seq, i) ->
-                seq.map($ -> i < $.commands().size() ? $.commands().get(i) : null));
+                seq.map($ -> 0 <= i && i < $.commands().size() ? $.commands().get(i) : null));
         nextCommandStem = map(nextCommand, $ -> $.map(tc -> tc.command().stem()).orElse(""));
 
-        currentCommandIndex = discreteResource(-1);
-        currentCommand = map(loadedSequence, currentCommandIndex, (seq, i) ->
-                seq.map($ -> i < $.commands().size() ? $.commands().get(i) : null));
-        currentCommandStem = map(currentCommand, $ -> $.map(tc -> tc.command().stem()).orElse(""));
+        lastDispatchedCommandIndex = discreteResource(-1);
+        lastDispatchedCommand = map(loadedSequence, lastDispatchedCommandIndex, (seq, i) ->
+                seq.map($ -> 0 <= i && i < $.commands().size() ? $.commands().get(i) : null));
+        lastDispatchedCommandStem = map(lastDispatchedCommand, $ -> $.map(tc -> tc.command().stem()).orElse(""));
 
         sequenceLoadCounter = discreteResource(0);
         commandDispatchCounter = discreteResource(0);
         currentCommandComplete = discreteResource(false);
-        timeSinceLastDispatch = resource(pausedStopwatch());
+        timeOfLastDispatch = discreteResource(Duration.ZERO);
 
+        // TODO - nextCommandIsReady is written kind of messily, from a functional perspective.
+        // The "proper" way to write this would use either a map with all the resource arguments,
+        // or would bind the necessary resources for each branch...
+        // We can get away with this for now because none of the resources involved should ever expire nor error.
         Resource<Discrete<Condition>> nextCommandIsReady = map(nextCommand, $ -> $.map(timedCommand -> switch (timedCommand.timeTag()) {
             case TimedCommand.AbsoluteTimeTag absoluteTimeTag ->
-                // TODO - find where I implemented absolute clocks and make an Aerie PR with just that...
-                // Small hack to build a condition for an absolute time.
-                // Really, this should be built into an absolute clock, or easily built from one.
-                    (Condition) (positive, atEarliest, atLatest) -> {
-                        var targetTime = Durations.between(currentValue(mission.clock), absoluteTimeTag.time());
-                        if (positive) {
-                            return Optional.of(Duration.max(targetTime, atEarliest)).filter(atLatest::noShorterThan);
-                        } else {
-                            return Optional.of(atEarliest).filter(targetTime::longerThan);
-                        }
-                    };
+                    TimeCondition.in(Durations.between(currentValue(mission.clock), absoluteTimeTag.time()));
             case TimedCommand.CommandCompleteTimeTag commandCompleteTimeTag ->
                     when(currentCommandComplete);
-            case TimedCommand.EpochRelativeTimeTag epochRelativeTimeTag ->
-                    // TODO - similar to absolute time, replace this with something cleaner using absolute clocks.
-                    (Condition) (positive, atEarliest, atLatest) -> {
-                        var absoluteTargetTime = Duration.addToInstant(
-                                currentValue(epoch).orElseThrow(() ->
-                                        new IllegalStateException("Epoch relative commanding used without a loaded epoch on engine " + engineId)),
-                                epochRelativeTimeTag.offset());
-                        var targetTime = Durations.between(currentValue(mission.clock), absoluteTargetTime);
-                        if (positive) {
-                            return Optional.of(Duration.max(targetTime, atEarliest)).filter(atLatest::noShorterThan);
-                        } else {
-                            return Optional.of(atEarliest).filter(targetTime::longerThan);
-                        }
-                    };
+            case TimedCommand.EpochRelativeTimeTag epochRelativeTimeTag -> {
+                var resolvedEpoch = currentValue(epoch).orElseThrow(() ->
+                        new IllegalStateException("Epoch relative commanding used without a loaded epoch on engine " + engineId));
+                var absoluteTargetTime = Duration.addToInstant(resolvedEpoch, epochRelativeTimeTag.offset());
+                yield TimeCondition.in(Durations.between(currentValue(mission.clock), absoluteTargetTime));
+            }
             case TimedCommand.RelativeTimeTag relativeTimeTag ->
-                    when(greaterThanOrEquals(timeSinceLastDispatch, constant(relativeTimeTag.offset())));
+                    TimeCondition.at(currentValue(timeOfLastDispatch).plus(relativeTimeTag.offset()));
         })
                 // When there is no next command, because either the sequence was unloaded or nextCommandIndex is not legal,
                 // return TRUE to cycle the engine immediately. This terminates a finished sequence immediately.
@@ -121,10 +105,10 @@ public class FcplSequenceEngine {
         registrar.discrete(prefix + "isActive", active, $boolean());
         registrar.discrete(prefix + "isLoaded", isLoaded, $boolean());
         registrar.discrete(prefix + "loadedSequence", loadedSequenceId, string());
-        registrar.discrete(prefix + "currentCommandIndex", currentCommandIndex, $int());
-        registrar.discrete(prefix + "currentCommand", currentCommandStem, string());
         registrar.discrete(prefix + "nextCommandIndex", nextCommandIndex, $int());
         registrar.discrete(prefix + "nextCommand", nextCommandStem, string());
+        registrar.discrete(prefix + "lastDispatchedCommandIndex", lastDispatchedCommandIndex, $int());
+        registrar.discrete(prefix + "lastDispatchedCommand", lastDispatchedCommandStem, string());
     }
 
     public void unload() {
@@ -135,6 +119,7 @@ public class FcplSequenceEngine {
 
         turnOff(currentCommandComplete);
         increment(sequenceLoadCounter);
+        set(lastDispatchedCommandIndex, -1);
     }
 
     public void load(Sequence sequence) {
@@ -151,6 +136,9 @@ public class FcplSequenceEngine {
     /**
      * Synchronously run the currently-loaded sequence.
      * Spawned command activities will appear as children of the current task.
+     * <p>
+     *     Method returns when sequence finishes executing.
+     * </p>
      */
     public void execute() {
         if (!currentValue(isLoaded)) {
@@ -164,6 +152,8 @@ public class FcplSequenceEngine {
         }
 
         turnOn(active);
+        // For the purposes of relative-timed dispatch, sequence execution counts as the first time of last dispatch.
+        set(timeOfLastDispatch, currentTime());
         int sequenceLoadNumber = currentValue(sequenceLoadCounter);
         // Iteratively dispatch commands until either
         while (currentValue(sequenceLoadCounter) == sequenceLoadNumber) {
@@ -184,12 +174,14 @@ public class FcplSequenceEngine {
         currentValue(nextCommand).ifPresentOrElse(
                 // Dispatch is done within a spawn to support overlapping commanding
                 timedCommand -> spawn(replaying(() -> {
+                    set(lastDispatchedCommandIndex, currentValue(nextCommandIndex));
                     // By default, the next command to dispatch is just the command after this one.
                     increment(nextCommandIndex);
                     // Use the command dispatch counter to detect overlapping command execution,
                     // and avoid earlier-dispatched commands from inadvertently marking later commands as complete.
                     increment(commandDispatchCounter);
                     int commandDispatchNumber = currentValue(commandDispatchCounter);
+                    set(timeOfLastDispatch, currentTime());
                     // Run the command itself through a call, not a spawn, so we know when it finishes.
                     timedCommand.command().call(mission);
                     // Check that we haven't dispatched another command before we set the command complete flag.
@@ -215,5 +207,44 @@ public class FcplSequenceEngine {
 
     public Resource<Discrete<String>> loadedSequenceId() {
         return loadedSequenceId;
+    }
+
+    public Resource<Discrete<Integer>> nextCommandIndex() {
+        return nextCommandIndex;
+    }
+
+    public Resource<Discrete<Optional<TimedCommand>>> nextCommand() {
+        return nextCommand;
+    }
+
+    public Resource<Discrete<String>> nextCommandStem() {
+        return nextCommandStem;
+    }
+
+    public Resource<Discrete<Integer>> lastDispatchedCommandIndex() {
+        return lastDispatchedCommandIndex;
+    }
+
+    public Resource<Discrete<Optional<TimedCommand>>> lastDispatchedCommand() {
+        return lastDispatchedCommand;
+    }
+
+    public Resource<Discrete<String>> lastDispatchedCommandStem() {
+        return lastDispatchedCommandStem;
+    }
+
+    // Additional utility functions
+    // These could arguably be split into a separate utility class as static methods acting on the public methods above.
+    public Resource<Discrete<Boolean>> isLoadedWith(Sequence sequence) {
+        return map(loadedSequence(), $ -> $.orElse(null) == sequence);
+    }
+
+    public Resource<Discrete<Boolean>> lastDispatched(Command cmd) {
+        return map(lastDispatchedCommand(), $ -> $.map(TimedCommand::command).orElse(null) == cmd);
+    }
+
+    public Condition nextDispatch() {
+        var i = currentValue(lastDispatchedCommandIndex());
+        return when(notEquals(lastDispatchedCommandIndex(), constant(i)));
     }
 }

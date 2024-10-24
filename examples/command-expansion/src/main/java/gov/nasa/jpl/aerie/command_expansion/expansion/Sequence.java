@@ -16,26 +16,15 @@ public record Sequence(
         return new SeqJsonSequence(
                 seqId,
                 commands.stream()
-                        .map(cmd -> new SeqJsonStep(
-                                "command",
+                        .map(cmd -> SeqJsonStep.command(
                                 switch (cmd.timeTag()) {
-                                    case TimedCommand.AbsoluteTimeTag absolute ->
-                                            new SeqJsonStepTime("ABSOLUTE", absolute.time());
-                                    case TimedCommand.RelativeTimeTag relative ->
-                                            new SeqJsonStepTime("RELATIVE", relative.offset());
-                                    case TimedCommand.EpochRelativeTimeTag epochRelative ->
-                                            new SeqJsonStepTime("EPOCH_RELATIVE", epochRelative.offset());
-                                    case TimedCommand.CommandCompleteTimeTag commandComplete ->
-                                            new SeqJsonStepTime("COMMAND_COMPLETE", null);
+                                    case TimedCommand.AbsoluteTimeTag absolute -> SeqJsonStepTime.absolute(absolute.time());
+                                    case TimedCommand.RelativeTimeTag relative -> SeqJsonStepTime.relative(relative.offset());
+                                    case TimedCommand.EpochRelativeTimeTag epochRelative -> SeqJsonStepTime.epochRelative(epochRelative.offset());
+                                    case TimedCommand.CommandCompleteTimeTag commandComplete -> SeqJsonStepTime.commandComplete();
                                 },
                                 cmd.command().stem(),
-                                cmd.command().args().stream()
-                                        .map(arg -> switch (arg) {
-                                            case Number n -> new SeqJsonCommandArg("number", n);
-                                            case String s -> new SeqJsonCommandArg("string", s);
-                                            default -> throw new RuntimeException("Unsupported arg type: " + arg.getClass().getSimpleName());
-                                        })
-                                        .toList()
+                                cmd.command().args().stream().map(SeqJsonCommandArg::of).toList()
                         ))
                         .toList()
         );

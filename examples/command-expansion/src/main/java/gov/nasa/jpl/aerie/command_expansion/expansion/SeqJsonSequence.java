@@ -9,8 +9,10 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.*;
@@ -18,6 +20,10 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.*;
 // Also a mission-specific type, but this designed to directly mirror the serialized format.
 // Since we're using Seq.JSON as our sample format, I'm using Jackson to describe the format as a Java class.
 // Other missions might need to do more for serialization
+
+/**
+ * Serializable representation of SEQ JSON.
+ */
 public record SeqJsonSequence(
         String id,
         List<SeqJsonStep> steps
@@ -27,18 +33,47 @@ public record SeqJsonSequence(
             SeqJsonStepTime time,
             String stem,
             List<SeqJsonCommandArg> args
-    ) {}
+    ) {
+        public static SeqJsonStep command(SeqJsonStepTime time, String stem, List<SeqJsonCommandArg> args) {
+            return new SeqJsonStep("command", time, stem, args);
+        }
+    }
 
     public record SeqJsonStepTime(
             String type,
             @JsonSerialize(using = SeqJsonStepTimeSerializer.class)
             Object tag
-    ) {}
+    ) {
+        public static SeqJsonStepTime absolute(Instant time) {
+            return new SeqJsonStepTime("ABSOLUTE", time);
+        }
+
+        public static SeqJsonStepTime relative(Duration offset) {
+            return new SeqJsonStepTime("RELATIVE", offset);
+        }
+
+        public static SeqJsonStepTime epochRelative(Duration offset) {
+            return new SeqJsonStepTime("EPOCH_RELATIVE", offset);
+        }
+
+        public static SeqJsonStepTime commandComplete() {
+            return new SeqJsonStepTime("COMMAND_COMPLETE", null);
+        }
+    }
 
     public record SeqJsonCommandArg(
             String type,
             Object value
-    ) {}
+    ) {
+        public static SeqJsonCommandArg of(Object value) {
+            return switch (value) {
+                case Number n -> new SeqJsonCommandArg("number", n);
+                case String s -> new SeqJsonCommandArg("string", s);
+                case Enum<?> e -> new SeqJsonCommandArg("string", e.name());
+                default -> throw new RuntimeException("Unsupported arg type: " + value.getClass().getSimpleName());
+            };
+        }
+    }
 
     public String serialize() {
         try {
@@ -56,7 +91,10 @@ public record SeqJsonSequence(
                     jsonGenerator.writeNull();
                     break;
                 case Instant instant:
-                    jsonGenerator.writeString(new SimpleDateFormat("yyyy-DDD'T'HH:mm:ss.SSS").format(instant));
+                    jsonGenerator.writeString(
+                            DateTimeFormatter.ofPattern("yyyy-DDD'T'HH:mm:ss.SSS")
+                                    .withZone(ZoneId.from(ZoneOffset.UTC))
+                                    .format(instant));
                     break;
                 case Duration duration:
                     jsonGenerator.writeString(hmsFormat(duration));
