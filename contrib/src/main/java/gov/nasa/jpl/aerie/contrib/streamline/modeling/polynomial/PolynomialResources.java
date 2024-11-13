@@ -5,7 +5,6 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.CommutativityTestInp
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.*;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -17,9 +16,9 @@ import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAwareOperations;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAwareResources;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.DoubleUtils;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
-import gov.nasa.jpl.aerie.merlin.framework.ValueMapper;
-import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.apache.commons.lang3.mutable.MutableObject;
 
@@ -31,6 +30,7 @@ import java.util.TreeMap;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.doubleArray;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.testing;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
@@ -72,91 +72,35 @@ public final class PolynomialResources {
     return result;
   }
 
-  public static MutableResource<Polynomial> polynomialResource(double... initialCoefficients) {
+  public static PolynomialResourceBuilder polynomialResource() {
+    return new PolynomialResourceBuilder();
+  }
+
+  public static PolynomialResourceBuilder polynomialResource(double... initialCoefficients) {
     return polynomialResource(polynomial(initialCoefficients));
   }
 
-  public static MutableResource<Polynomial> polynomialResource(Polynomial initialDynamics) {
-    return resource(initialDynamics, autoEffects(testing(
-        (CommutativityTestInput<Polynomial> input) -> {
-          Polynomial original = input.original();
-          Polynomial left = input.leftResult();
-          Polynomial right = input.rightResult();
-          return left.degree() == right.degree() &&
-                 IntStream.rangeClosed(0, left.degree()).allMatch(
-                     i -> DoubleUtils.areEqualResults(
-                         original.getCoefficient(i),
-                         left.getCoefficient(i),
-                         right.getCoefficient(i)));
-        })));
+  public static PolynomialResourceBuilder polynomialResource(Polynomial initialDynamics) {
+    return polynomialResource().defaultValue(initialDynamics);
   }
 
-  public class PolynomialResourceBuilder {
-    private ErrorCatching<Expiring<Polynomial>> defaultValue;
-    private String name;
-    private InconBehavior<ErrorCatching<Expiring<Polynomial>>> inconBehavior;
-    private EffectTrait<DynamicsEffect<Polynomial>> effectTrait = autoEffects(testing(
-        (CommutativityTestInput<Polynomial> input) -> {
-          Polynomial original = input.original();
-          Polynomial left = input.leftResult();
-          Polynomial right = input.rightResult();
-          return left.degree() == right.degree() &&
-                 IntStream.rangeClosed(0, left.degree()).allMatch(
-                     i -> DoubleUtils.areEqualResults(
-                         original.getCoefficient(i),
-                         left.getCoefficient(i),
-                         right.getCoefficient(i)));
-        }));
-
-    public PolynomialResourceBuilder defaultValue(Polynomial defaultValue) {
-      return defaultValue(DynamicsMonad.pure(defaultValue));
-    }
-
-    public PolynomialResourceBuilder defaultValue(ErrorCatching<Expiring<Polynomial>> defaultValue) {
-      this.defaultValue = defaultValue;
-      return this;
-    }
-
-    public PolynomialResourceBuilder name(String name) {
-      this.name = name;
-      return this;
-    }
-
-    public PolynomialResourceBuilder notSaved() {
-      assertSet("default value", defaultValue);
-      return inconBehavior(notSaving(defaultValue));
-    }
-
-    public PolynomialResourceBuilder serialized() {
-      assertSet("name", name);
-      assertSet("default value", defaultValue);
-      return inconBehavior(serializing(name, defaultValue, standardDynamicsMapper(null /* TODO - get auto value mapper for polynomial */)));
-    }
-
-    public PolynomialResourceBuilder inconBehavior(InconBehavior<ErrorCatching<Expiring<Polynomial>>> inconBehavior) {
-      this.inconBehavior = inconBehavior;
-      return this;
-    }
-
-    public PolynomialResourceBuilder effectTrait(EffectTrait<DynamicsEffect<Polynomial>> effectTrait) {
-      this.effectTrait = effectTrait;
-      return this;
-    }
-
-    private void assertSet(String name, Object thing) {
-      if (thing == null)
-        throw new IllegalStateException(String.format("%s has not been set on this builder!", name));
-    }
-
-    // Terminal methods - these build and return the resource
-
-    public MutableResource<Polynomial> notRegistered() {
-      // If no incon behavior is set, default to serializing the value in the default way.
-      if (inconBehavior == null) serialized();
-      assertSet("effect trait", effectTrait);
-      var result = resource(inconBehavior, effectTrait);
-      if (name != null) Naming.name(result, name);
-      return result;
+  public static class PolynomialResourceBuilder extends BaseMutableResourceBuilder<Polynomial, PolynomialResourceBuilder> {
+    public PolynomialResourceBuilder() {
+      // By default, polynomial resources are compared using a toleranced equality applied to every coefficient.
+      effectTrait(autoEffects(testing(
+              (CommutativityTestInput<Polynomial> input) -> {
+                Polynomial original = input.original();
+                Polynomial left = input.leftResult();
+                Polynomial right = input.rightResult();
+                return left.degree() == right.degree() &&
+                        IntStream.rangeClosed(0, left.degree()).allMatch(
+                                i -> DoubleUtils.areEqualResults(
+                                        original.getCoefficient(i),
+                                        left.getCoefficient(i),
+                                        right.getCoefficient(i)));
+              })));
+      // Since a Polynomial is "just" its coefficients, just use the coefficients' value mapper for polynomials.
+      dynamicsMapper(ValueMappers.map(doubleArray(), InvertibleFunction.of(Polynomial::polynomial, Polynomial::coefficients)));
     }
   }
 
@@ -221,9 +165,7 @@ public final class PolynomialResources {
                         p.degree()));
       }
     });
-    // Since this method is often used to register a polynomial,
-    // propagate names backwards from the linear result to the polynomial input.
-    name(polynomial, "%s", result);
+    name(result, "%s");
     return result;
   }
 
@@ -385,8 +327,11 @@ public final class PolynomialResources {
    *   This method allocates a cell, so must be called during initialization, not simulation.
    * </p>
    */
-  public static Resource<Polynomial> integrate(Resource<Polynomial> integrand, double startingValue) {
-    var cell = resource(DynamicsMonad.map(integrand.getDynamics(), (Polynomial $) -> $.integral(startingValue)));
+  public static Resource<Polynomial> integrate(Resource<Polynomial> integrand, double defaultValue, String name) {
+    var cell = polynomialResource()
+            .defaultValue(DynamicsMonad.map(integrand.getDynamics(), (Polynomial $) -> $.integral(defaultValue)))
+            .name(name)
+            .build();
     // Use integrand's expiry but not integral's, since we're refreshing the integral
     wheneverDynamicsChange(integrand, integrandDynamics ->
         cell.emit(bindEffect(integral -> DynamicsMonad.map(integrandDynamics, integrand$ ->
@@ -438,13 +383,13 @@ public final class PolynomialResources {
    * </p>
    */
   public static ClampedIntegrateResult clampedIntegrate(
-          Resource<Polynomial> integrand, Resource<Polynomial> lowerBound, Resource<Polynomial> upperBound, double startingValue) {
+          Resource<Polynomial> integrand, Resource<Polynomial> lowerBound, Resource<Polynomial> upperBound, double defaultValue, String name) {
     // There are more elegant ways to write this method, but profiling suggests this is often a bottleneck to models that use it.
     // So, we're writing it very carefully to maximize performance.
 
-    MutableResource<Polynomial> integral = polynomialResource(startingValue);
-    MutableResource<Polynomial> overflow = polynomialResource(0);
-    MutableResource<Polynomial> underflow = polynomialResource(0);
+    MutableResource<Polynomial> integral = polynomialResource(defaultValue).name(name).build();
+    MutableResource<Polynomial> overflow = polynomialResource(0).name(name + "-overflow").build();
+    MutableResource<Polynomial> underflow = polynomialResource(0).name(name + "-underflow").build();
 
     MutableObject<Condition> condition = new MutableObject<>(Condition.TRUE); // Run once immediately to get the loop started.
     Reactions.whenever(condition::getValue, () -> {
@@ -548,7 +493,7 @@ public final class PolynomialResources {
   }
 
   /**
-   * The result of a {@link PolynomialResources#clampedIntegrate(Resource, Resource, Resource, double)} call.
+   * The result of a {@link PolynomialResources#clampedIntegrate(Resource, Resource, Resource, double, String)} call.
    *
    * @param integral    The clamped integral value.
    * @param overflow    The rate of overflow, when integral hits upper bound.
@@ -574,11 +519,11 @@ public final class PolynomialResources {
   /**
    * Return a resource which is the average of the operand over the last interval time.
    */
-  public static Resource<Polynomial> movingAverage(Resource<Polynomial> p, Duration interval) {
-    var pIntegral = integrate(p, 0);
+  public static Resource<Polynomial> movingAverage(Resource<Polynomial> p, Duration interval, String name) {
+    var pIntegral = integrate(p, 0, name + "-operand-integral");
     var shiftedIntegral = shift(pIntegral, interval, polynomial(0));
     var result = divide(subtract(pIntegral, shiftedIntegral), DiscreteResourceMonad.pure(interval.ratioOver(SECOND)));
-    name(result, "Moving Average (%s)", p);
+    name(result, name);
     return result;
   }
 
@@ -767,10 +712,11 @@ public final class PolynomialResources {
    *   This method allocates a cell, so must be called during initialization, not simulation.
    * </p>
    */
-  public static UnitAware<Resource<Polynomial>> integrate(UnitAware<? extends Resource<Polynomial>> p, UnitAware<Double> startingValue) {
-    return UnitAwareOperations.integrate(extend(PolynomialResources::scalePolynomial),
-                                         PolynomialResources::integrate,
-                                         p, startingValue);
+  public static UnitAware<Resource<Polynomial>> integrate(UnitAware<? extends Resource<Polynomial>> p, UnitAware<Double> startingValue, String name) {
+    return UnitAwareOperations.integrate(
+            extend(PolynomialResources::scalePolynomial),
+            (p$, v0) -> integrate(p$, v0, name),
+            p, startingValue);
   }
 
   /**
@@ -806,13 +752,19 @@ public final class PolynomialResources {
    * time  0        10        20
    * </pre>
    */
-  public static UnitAwareClampedIntegrateResult clampedIntegrate(UnitAware<? extends Resource<Polynomial>> p, UnitAware<? extends Resource<Polynomial>> lowerBound, UnitAware<? extends Resource<Polynomial>> upperBound, UnitAware<Double> startingValue) {
+  public static UnitAwareClampedIntegrateResult clampedIntegrate(
+          UnitAware<? extends Resource<Polynomial>> p,
+          UnitAware<? extends Resource<Polynomial>> lowerBound,
+          UnitAware<? extends Resource<Polynomial>> upperBound,
+          UnitAware<Double> startingValue,
+          String name) {
     final Unit resultUnit = p.unit().multiply(StandardUnits.SECOND);
     var unitNaiveResult = clampedIntegrate(
             p.value(),
             lowerBound.value(resultUnit),
             upperBound.value(resultUnit),
-            startingValue.value(resultUnit));
+            startingValue.value(resultUnit),
+            name);
     return new UnitAwareClampedIntegrateResult(
         unitAware(unitNaiveResult.integral(), resultUnit),
         unitAware(unitNaiveResult.overflow(), p.unit()),
@@ -820,7 +772,7 @@ public final class PolynomialResources {
   }
 
   /**
-   * The result of a {@link PolynomialResources#clampedIntegrate(UnitAware, UnitAware, UnitAware, UnitAware)} call.
+   * The result of a {@link PolynomialResources#clampedIntegrate(UnitAware, UnitAware, UnitAware, UnitAware, String)} call.
    *
    * @param integral    The clamped integral value.
    * @param overflow    The rate of overflow, when integral hits upper bound.

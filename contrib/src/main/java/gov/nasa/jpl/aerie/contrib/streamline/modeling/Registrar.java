@@ -8,6 +8,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ThinResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Logging;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
@@ -42,7 +43,7 @@ public class Registrar {
   private boolean trace = false;
   private boolean profile = false;
   private final ErrorBehavior errorBehavior;
-  private final MutableResource<Discrete<Integer>> numberOfErrors = discreteResource(0);
+  private final MutableResource<Discrete<Integer>> numberOfErrors = discreteResource(0).name("numberOfErrors").build();
 
   public enum ErrorBehavior {
     /**
@@ -62,7 +63,7 @@ public class Registrar {
     this.baseRegistrar = baseRegistrar;
     this.errorBehavior = errorBehavior;
 
-    discrete("numberOfErrors", numberOfErrors, new IntegerValueMapper());
+    discrete(numberOfErrors, new IntegerValueMapper());
   }
 
   public void setTrace() {
@@ -81,8 +82,8 @@ public class Registrar {
     profile = false;
   }
 
-  public <Value> void discrete(final String name, final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {
-    name(resource, name);
+  public <Value> void discrete(final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {
+    String name = Naming.getName(resource).orElseThrow(() -> new IllegalStateException("resource does not have a name"));
     var debugResource = debug(name, resource);
     gov.nasa.jpl.aerie.merlin.framework.Resource<Value> registeredResource = switch (errorBehavior) {
       case Log -> () -> currentValue(debugResource, null);
@@ -92,8 +93,13 @@ public class Registrar {
     if (errorBehavior.equals(Log)) logErrors(name, debugResource);
   }
 
-  public void real(final String name, final Resource<Linear> resource) {
-    name(resource, name);
+  // TODO - delete this method, in favor of naming the resource when constructing it.
+  public <Value> void discrete(final String name, final Resource<Discrete<Value>> resource, final ValueMapper<Value> mapper) {
+    discrete(name(resource, name), mapper);
+  }
+
+  public void real(final Resource<Linear> resource) {
+    String name = Naming.getName(resource).orElseThrow(() -> new IllegalStateException("resource does not have a name"));
     var debugResource = debug(name, resource);
     gov.nasa.jpl.aerie.merlin.framework.Resource<RealDynamics> registeredResource = switch (errorBehavior) {
       case Log -> () -> realDynamics(currentData(debugResource, linear(0, 0)));
@@ -101,6 +107,11 @@ public class Registrar {
     };
     baseRegistrar.real(name, registeredResource);
     if (errorBehavior.equals(Log)) logErrors(name, debugResource);
+  }
+
+  // TODO - delete this method, in favor of naming the resource when constructing it.
+  public void real(final String name, final Resource<Linear> resource) {
+    real(name(resource, name));
   }
 
   private static RealDynamics realDynamics(Linear linear) {

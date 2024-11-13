@@ -7,15 +7,14 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDy
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.DoubleUtils;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Unit;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAwareResources;
-import gov.nasa.jpl.aerie.merlin.framework.Result;
 import gov.nasa.jpl.aerie.merlin.framework.ValueMapper;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
-import gov.nasa.jpl.aerie.merlin.protocol.types.SerializedValue;
-import gov.nasa.jpl.aerie.merlin.protocol.types.ValueSchema;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -93,27 +92,8 @@ public final class DiscreteResources {
     }
 
     public DiscreteResourceBuilder<T> valueMapper(final ValueMapper<T> mapper) {
-      return dynamicsMapper(standardDiscreteMapper(mapper));
+      return dynamicsMapper(ValueMappers.map(mapper, InvertibleFunction.of(Discrete::discrete, Discrete::extract)));
     }
-  }
-
-  public static <T> ValueMapper<Discrete<T>> standardDiscreteMapper(ValueMapper<T> mapper) {
-    return new ValueMapper<>() {
-      @Override
-      public ValueSchema getValueSchema() {
-        return mapper.getValueSchema();
-      }
-
-      @Override
-      public Result<Discrete<T>, String> deserializeValue(SerializedValue serializedValue) {
-        return mapper.deserializeValue(serializedValue).mapSuccess(Discrete::discrete);
-      }
-
-      @Override
-      public SerializedValue serializeValue(Discrete<T> value) {
-        return mapper.serializeValue(value.extract());
-      }
-    };
   }
 
   /**

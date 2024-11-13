@@ -41,56 +41,56 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
 
   class MutableResourceBuilder<D extends Dynamics<?, D>> extends BaseMutableResourceBuilder<D, MutableResourceBuilder<D>> {}
 
-  class BaseMutableResourceBuilder<D extends Dynamics<?, D>, B extends BaseMutableResourceBuilder<D, B>> {
+  class BaseMutableResourceBuilder<D extends Dynamics<?, D>, Self extends BaseMutableResourceBuilder<D, Self>> {
     private String name;
     private ErrorCatching<Expiring<D>> defaultValue;
     private ValueMapper<ErrorCatching<Expiring<D>>> dynamicsMapper;
     private InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior;
     private EffectTrait<DynamicsEffect<D>> effectTrait = autoEffects();
 
-    public B name(final String name) {
+    public Self name(final String name) {
       this.name = name;
-      return (B) this;
+      return (Self) this;
     }
 
-    public B defaultValue(final D initialValue) {
+    public Self defaultValue(final D initialValue) {
       return defaultValue(pure(initialValue));
     }
 
-    public B defaultValue(final ErrorCatching<Expiring<D>> initialValue) {
+    public Self defaultValue(final ErrorCatching<Expiring<D>> initialValue) {
       this.defaultValue = initialValue;
-      return (B) this;
+      return (Self) this;
     }
 
-    public B dynamicsMapper(final ValueMapper<D> dynamicsMapper) {
+    public Self dynamicsMapper(final ValueMapper<D> dynamicsMapper) {
       return fullDynamicsMapper(standardDynamicsMapper(dynamicsMapper));
     }
 
-    public B fullDynamicsMapper(final ValueMapper<ErrorCatching<Expiring<D>>> dynamicsMapper) {
+    public Self fullDynamicsMapper(final ValueMapper<ErrorCatching<Expiring<D>>> dynamicsMapper) {
       this.dynamicsMapper = dynamicsMapper;
-      return (B) this;
+      return (Self) this;
     }
 
-    public B notSaved() {
+    public Self notSaved() {
       assertSet("default value", defaultValue);
       return inconBehavior(notSaving(defaultValue));
     }
 
-    public B saved() {
+    public Self saved() {
       assertSet("name", name);
       assertSet("default value", defaultValue);
       assertSet("dynamics mapper", dynamicsMapper);
       return inconBehavior(serializing(name, defaultValue, dynamicsMapper));
     }
 
-    public B inconBehavior(final InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior) {
+    public Self inconBehavior(final InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior) {
       this.inconBehavior = inconBehavior;
-      return (B) this;
+      return (Self) this;
     }
 
-    public B effectTrait(final EffectTrait<DynamicsEffect<D>> effectTrait) {
+    public Self effectTrait(final EffectTrait<DynamicsEffect<D>> effectTrait) {
       this.effectTrait = effectTrait;
-      return (B) this;
+      return (Self) this;
     }
 
     public MutableResource<D> build() {
@@ -143,11 +143,6 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     return InconBehavior.of($ -> initialValue, (s, f) -> {});
   }
 
-  // TODO - It would be nice if the name we set here could somehow auto-populate the name of the resource,
-  //  and also be the name we register the resource as. Same for the value mapper, it would be nice to just use that for registration too.
-  // Alternatively, we could demand a name for every MutableResource, and combine that with the other info here later...?
-  // On reflection, I think the discrete resource and linear resource constructors are the place to combine all this info.
-  // Those would know which registrar method to call, and what value mapper to use.
   static <D> InconBehavior<ErrorCatching<Expiring<D>>> serializing(String key, D defaultValue, ValueMapper<D> mapper) {
     return serializing(key, pure(defaultValue), standardDynamicsMapper(mapper));
   }

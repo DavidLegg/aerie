@@ -7,7 +7,6 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialEffects;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
@@ -17,7 +16,6 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 import java.util.Optional;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.notSaving;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.Approximation.approximate;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.DifferentiableResources.asDifferentiable;
@@ -48,22 +46,21 @@ import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomi
 import static gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Quantities.quantity;
 import static gov.nasa.jpl.aerie.contrib.streamline.unit_aware.StandardUnits.*;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 
 public final class Demo {
 
   // Unit-naive version of a model, to demonstrate some core concepts:
 
   // Consumable, continuous:
-  MutableResource<Polynomial> fuel_kg = PolynomialResources.polynomialResource(20.0);
+  MutableResource<Polynomial> fuel_kg = polynomialResource(20.0);
   // Non-consumable, discrete:
-  MutableResource<Discrete<Double>> power_w = discreteResource(120.0);
+  MutableResource<Discrete<Double>> power_w = discreteResource(120.0).name("power_w").build();
   // Atomic non-consumable:
-  MutableResource<Discrete<Integer>> rwaControl = DiscreteResources.discreteResource(1);
+  MutableResource<Discrete<Integer>> rwaControl = discreteResource(1).name("rwaControl").build();
   // Settable / enum state:
-  MutableResource<Discrete<OnOff>> enumSwitch = DiscreteResources.discreteResource(OnOff.ON);
+  MutableResource<Discrete<OnOff>> enumSwitch = discreteResource(OnOff.ON).name("enumSwitch").build();
   // Toggle / flag:
-  MutableResource<Discrete<Boolean>> boolSwitch = DiscreteResources.discreteResource(true);
+  MutableResource<Discrete<Boolean>> boolSwitch = discreteResource(true).name("boolSwitch").build();
 
   // Derived states:
   Resource<Discrete<OnOff>> derivedEnumSwitch = map(boolSwitch, b -> b ? OnOff.ON : OnOff.OFF);
@@ -98,10 +95,10 @@ public final class Demo {
   // Consumable, continuous:
   // CellResource<Polynomial> fuel_kg = polynomialCellResource(20.0);
   UnitAware<MutableResource<Polynomial>> fuel = unitAware(
-      PolynomialResources.polynomialResource(20.0), KILOGRAM);
+      polynomialResource(20.0), KILOGRAM);
   // Non-consumable, discrete:
   UnitAware<MutableResource<Discrete<Double>>> power = DiscreteResources.unitAware(
-      discreteResource(120.0), WATT);
+      discreteResource(120.0).name("power").build(), WATT);
 
   UnitAware<Resource<Polynomial>> batterySOC = integrate(asUnitAwarePolynomial(power), quantity(100, JOULE));
   UnitAware<Resource<Discrete<Double>>> clampedPower = DiscreteResources.unitAware(map(power.value(WATT), p -> p < 0 ? 0 : p), WATT);
@@ -125,13 +122,17 @@ public final class Demo {
 
   // Example of using unstructured resources + approximation to represent functions that aren't
   // easily represented by analytic derivations
-  Resource<Polynomial> p = PolynomialResources.polynomialResource(1, 2, 3);
-  Resource<Polynomial> q = PolynomialResources.polynomialResource(6, 5, 4);
+  Resource<Polynomial> p = polynomialResource(1, 2, 3);
+  Resource<Polynomial> q = polynomialResource(6, 5, 4);
   Resource<Unstructured<Double>> quotient = UnstructuredResourceApplicative.map(asUnstructured(p), asUnstructured(q), (p$, q$) -> p$ / q$);
   Resource<Linear> approxQuotient = approximate(quotient, secantApproximation(IntervalFunctions.<Unstructured<Double>>byBoundingError(
       1e-6, Duration.SECOND, Duration.HOUR.times(24), errorByOptimization())));
 
-  Resource<Unstructured<Pair<Vector3D, Vector3D>>> positionAndVelocity = resource(notSaving(Unstructured.timeBased(t -> /* some spice call */ null)));
+  Resource<Unstructured<Pair<Vector3D, Vector3D>>> positionAndVelocity = MutableResource.<Unstructured<Pair<Vector3D, Vector3D>>>resource()
+          .defaultValue(Unstructured.timeBased(t -> /* some spice call */ null))
+          .name("posVel")
+          .notSaved()
+          .build();
   Resource<Discrete<Pair<Vector3D, Vector3D>>> approxPosVel = approximate(
       positionAndVelocity,
       DiscreteApproximation.<Pair<Vector3D, Vector3D>, Unstructured<Pair<Vector3D, Vector3D>>>discreteApproximation(
@@ -162,8 +163,8 @@ public final class Demo {
 
   // Example of a locking state:
 
-  MutableResource<Discrete<Integer>> importantHardware = DiscreteResources.discreteResource(42);
-  MutableResource<Discrete<Optional<Integer>>> importantHardwareLock = DiscreteResources.discreteResource(Optional.empty());
+  MutableResource<Discrete<Integer>> importantHardware = discreteResource(42).name("hw").build();
+  MutableResource<Discrete<Optional<Integer>>> importantHardwareLock = discreteResource(Optional.<Integer>empty()).name("hwLock").build();
   Resource<Discrete<Boolean>> importantHardwareLockAssertion = assertThat(
       "Important hardware does not change state while locked",
       map(importantHardwareLock, importantHardware, (lock, state) -> lock.map(state::equals).orElse(true)));
