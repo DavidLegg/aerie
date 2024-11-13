@@ -3,6 +3,7 @@ package gov.nasa.jpl.aerie.contrib.streamline.core;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Context;
+import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Profiling;
 import gov.nasa.jpl.aerie.merlin.framework.CellRef;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.Cell;
@@ -34,41 +35,104 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     emit(name(effect, effectName));
   }
 
-  static <D extends Dynamics<?, D>> MutableResource<D> resource(InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior) {
-    // Use autoEffects for a generic CellResource, on the theory that most resources
-    // have relatively few effects, and even fewer concurrent effects, so this is performant enough.
-    // If that doesn't hold, a more specialized solution can be constructed directly.
-    return resource(inconBehavior, autoEffects());
+  static <D extends Dynamics<?, D>> MutableResourceBuilder<D> resource() {
+    return new MutableResourceBuilder<>();
   }
 
-  static <D extends Dynamics<?, D>> MutableResource<D> resource(
-          InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior,
-          EffectTrait<DynamicsEffect<D>> effectTrait) {
-    MutableResource<D> result = new MutableResource<>() {
-      private final CellRef<DynamicsEffect<D>, Cell<D>> cell = allocate(inconBehavior, effectTrait);
+  class MutableResourceBuilder<D extends Dynamics<?, D>> extends BaseMutableResourceBuilder<D, MutableResourceBuilder<D>> {}
 
-      @Override
-      public void emit(final DynamicsEffect<D> effect) {
-        // NOTE: The strange pattern of naming effect::apply is to create a new object, identical in behavior to effect,
-        //   which we can assign a more informative name without actually getting the name of effect.
-        // Replacing effect::apply with effect would create a self-loop in the naming graph on effect, which isn't allowed.
-        // Using Naming.getName to get effect's current name and use that when elaborating is correct but potentially slow,
-        //   depending on how deep the naming graph is.
-        cell.emit(name(effect::apply, "%s on %s" + Context.get().stream().map(c -> " during " + c).collect(joining()), effect, this));
-      }
+  class BaseMutableResourceBuilder<D extends Dynamics<?, D>, B extends BaseMutableResourceBuilder<D, B>> {
+    private String name;
+    private ErrorCatching<Expiring<D>> defaultValue;
+    private ValueMapper<ErrorCatching<Expiring<D>>> dynamicsMapper;
+    private InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior;
+    private EffectTrait<DynamicsEffect<D>> effectTrait = autoEffects();
 
-      @Override
-      public ErrorCatching<Expiring<D>> getDynamics() {
-        return cell.get().dynamics;
+    public B name(final String name) {
+      this.name = name;
+      return (B) this;
+    }
+
+    public B defaultValue(final D initialValue) {
+      return defaultValue(pure(initialValue));
+    }
+
+    public B defaultValue(final ErrorCatching<Expiring<D>> initialValue) {
+      this.defaultValue = initialValue;
+      return (B) this;
+    }
+
+    public B dynamicsMapper(final ValueMapper<D> dynamicsMapper) {
+      return fullDynamicsMapper(standardDynamicsMapper(dynamicsMapper));
+    }
+
+    public B fullDynamicsMapper(final ValueMapper<ErrorCatching<Expiring<D>>> dynamicsMapper) {
+      this.dynamicsMapper = dynamicsMapper;
+      return (B) this;
+    }
+
+    public B notSaved() {
+      assertSet("default value", defaultValue);
+      return inconBehavior(notSaving(defaultValue));
+    }
+
+    public B saved() {
+      assertSet("name", name);
+      assertSet("default value", defaultValue);
+      assertSet("dynamics mapper", dynamicsMapper);
+      return inconBehavior(serializing(name, defaultValue, dynamicsMapper));
+    }
+
+    public B inconBehavior(final InconBehavior<ErrorCatching<Expiring<D>>> inconBehavior) {
+      this.inconBehavior = inconBehavior;
+      return (B) this;
+    }
+
+    public B effectTrait(final EffectTrait<DynamicsEffect<D>> effectTrait) {
+      this.effectTrait = effectTrait;
+      return (B) this;
+    }
+
+    public MutableResource<D> build() {
+      // If no incon behavior is given, default to "saved".
+      // This will error out if not enough info to save the resource is specified,
+      // guiding the user towards giving that info rather than opting out of saving the resource.
+      if (inconBehavior == null) saved();
+      assertSet("effect trait", effectTrait);
+
+      MutableResource<D> result = new MutableResource<>() {
+        private final CellRef<DynamicsEffect<D>, Cell<D>> cell = allocate(inconBehavior, effectTrait);
+
+        @Override
+        public void emit(final DynamicsEffect<D> effect) {
+          // NOTE: The strange pattern of naming effect::apply is to create a new object, identical in behavior to effect,
+          //   which we can assign a more informative name without actually getting the name of effect.
+          // Replacing effect::apply with effect would create a self-loop in the naming graph on effect, which isn't allowed.
+          // Using Naming.getName to get effect's current name and use that when elaborating is correct but potentially slow,
+          //   depending on how deep the naming graph is.
+          cell.emit(Naming.name(effect::apply, "%s on %s" + Context.get().stream().map(c -> " during " + c).collect(joining()), effect, this));
+        }
+
+        @Override
+        public ErrorCatching<Expiring<D>> getDynamics() {
+          return cell.get().dynamics;
+        }
+      };
+      if (name != null) {
+        Naming.name(result, name);
       }
-    };
-    if (MutableResourceFlags.DETECT_BUSY_CELLS) {
-      result = profileEffects(result);
+      if (MutableResourceFlags.DETECT_BUSY_CELLS) {
+        result = profileEffects(result);
+      }
+      if (MutableResourceFlags.PROFILE_GET_DYNAMICS) {
+        result = profile(result);
+      }
+      return result;
     }
-    if (MutableResourceFlags.PROFILE_GET_DYNAMICS) {
-      result = profile(result);
+
+    private void assertSet(final String name, final Object value) {
+      if (value == null) throw new IllegalStateException(name + " is not set");
     }
-    return result;
   }
 
   static <D> InconBehavior<ErrorCatching<Expiring<D>>> notSaving(D initialValue) {
