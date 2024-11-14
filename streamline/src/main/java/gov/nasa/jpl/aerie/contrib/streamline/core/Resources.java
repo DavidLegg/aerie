@@ -1,13 +1,10 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.InstantClock;
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,8 +18,6 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.InstantClockResources.addToInstant;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
@@ -32,34 +27,6 @@ import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.d
  */
 public final class Resources {
   private Resources() {}
-
-  /**
-   * Ensure that Resources are initialized.
-   *
-   * <p>
-   *   This method needs to be called once during simulation initialization.
-   * </p>
-   */
-  public static void init(Instant planStart) {
-    CLOCK = clock(ZERO).name("Global Simulation Clock").build();
-    ABSOLUTE_CLOCK = name(addToInstant(planStart, CLOCK), "Global Absolute Simulation Clock");
-  }
-
-  private static Resource<Clock> CLOCK;
-  private static Resource<InstantClock> ABSOLUTE_CLOCK;
-  public static Duration currentTime() {
-    return currentValue(CLOCK);
-  }
-  public static Instant currentInstant() {
-    return currentValue(ABSOLUTE_CLOCK);
-  }
-
-  public static Resource<Clock> simulationClock() {
-    return CLOCK;
-  }
-  public static Resource<InstantClock> absoluteClock() {
-    return ABSOLUTE_CLOCK;
-  }
 
   public static <D> D currentData(Resource<D> resource) {
     return data(resource.getDynamics());
@@ -101,10 +68,10 @@ public final class Resources {
    */
   public static <D extends Dynamics<?, D>> Condition dynamicsChange(Resource<D> resource) {
     final var startingDynamics = resource.getDynamics();
-    final Duration startTime = currentTime();
+    final Duration startTime = StreamlineSystem.currentTime();
     Condition result = (positive, atEarliest, atLatest) -> {
       var currentDynamics = resource.getDynamics();
-      var elapsedTime = currentTime().minus(startTime);
+      var elapsedTime = StreamlineSystem.currentTime().minus(startTime);
       boolean haveChanged = startingDynamics.match(
           start -> currentDynamics.match(
               current -> !current.data().equals(start.data().step(elapsedTime)) ||

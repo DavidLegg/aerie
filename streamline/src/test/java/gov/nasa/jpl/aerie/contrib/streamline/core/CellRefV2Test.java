@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.merlin.framework.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
@@ -8,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import java.time.Instant;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.commutingEffects;
@@ -29,7 +28,7 @@ class MutableResourceTest {
   @TestInstance(Lifecycle.PER_CLASS)
   class NonCommutingEffects {
     public NonCommutingEffects(final Registrar registrar) {
-      Resources.init(Instant.EPOCH);
+      StreamlineSystem.testInit(registrar);
       cell = resource(discrete(42)).notSaved().effectTrait(noncommutingEffects()).build();
     }
 
@@ -69,7 +68,7 @@ class MutableResourceTest {
   @TestInstance(Lifecycle.PER_CLASS)
   class CommutingEffects {
     public CommutingEffects(final Registrar registrar) {
-      Resources.init(Instant.EPOCH);
+      StreamlineSystem.testInit(registrar);
       cell = resource(discrete(42)).notSaved().effectTrait(commutingEffects()).build();
     }
 
@@ -112,8 +111,8 @@ class MutableResourceTest {
   @ExtendWith(MerlinExtension.class)
   @TestInstance(Lifecycle.PER_CLASS)
   class AutoEffects {
-    public AutoEffects() {
-      Resources.init(Instant.EPOCH);
+    public AutoEffects(final Registrar registrar) {
+      StreamlineSystem.testInit(registrar);
       cell = resource(discrete(42)).notSaved().effectTrait(autoEffects()).build();
     }
 

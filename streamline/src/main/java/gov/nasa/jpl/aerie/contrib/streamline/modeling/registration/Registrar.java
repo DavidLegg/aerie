@@ -1,11 +1,10 @@
-package gov.nasa.jpl.aerie.contrib.streamline.modeling;
+package gov.nasa.jpl.aerie.contrib.streamline.modeling.registration;
 
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.IntegerValueMapper;
 import gov.nasa.jpl.aerie.contrib.serialization.mappers.NullableValueMapper;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ThinResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Logging;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
@@ -25,7 +24,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Logging.LOGGER;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Profiling.profile;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Tracing.trace;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar.ErrorBehavior.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.registration.Registrar.ErrorBehavior.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.increment;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear.linear;
@@ -58,8 +57,6 @@ public class Registrar {
   }
 
   public Registrar(final gov.nasa.jpl.aerie.merlin.framework.Registrar baseRegistrar, final Instant planStart, final ErrorBehavior errorBehavior) {
-    Resources.init(planStart);
-    Logging.init(baseRegistrar);
     this.baseRegistrar = baseRegistrar;
     this.errorBehavior = errorBehavior;
 

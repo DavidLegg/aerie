@@ -8,29 +8,19 @@ import java.util.function.Consumer;
 public final class InitialConditionManager {
     private InitialConditionManager() {}
 
-    private static boolean initialized = false;
     private static InitialConditions initialConditions;
     private static Consumer<Map<String, SerializedValue>> finconHandler;
     private static List<Consumer<FinalConditions>> finconHooks;
 
     public static void init(InitialConditions initialConditions, Consumer<Map<String, SerializedValue>> finconHandler) {
-        if (initialized) {
-            throw new IllegalStateException("InitialConditionManager has already been initialized");
-        }
-
         InitialConditionManager.initialConditions = initialConditions;
         InitialConditionManager.finconHandler = finconHandler;
         InitialConditionManager.finconHooks = new ArrayList<>();
-        initialized = true;
     }
 
     // The "correct" way to get an initial value also registers a way to write the final value.
     // This is intended to remind the modeler that these operations are closely coupled.
     public static <T> T register(InconBehavior<T> behavior) {
-        if (!initialized) {
-            throw new IllegalStateException("InitialConditionManager has not been initialized");
-        }
-
         var result =  behavior.getIncon(initialConditions);
         // This looks admittedly strange, but the intent is for result to be something like a resource,
         // which is a stable handle for a state that changes over the course of the simulation.

@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.CommutativityTestInput;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
@@ -29,6 +30,7 @@ import java.util.TreeMap;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem.simulationClock;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.testing;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;

@@ -1,10 +1,11 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.ErrorCatching;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
+import gov.nasa.jpl.aerie.merlin.framework.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.junit.jupiter.api.Test;
@@ -12,13 +13,9 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.time.Instant;
-
-import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
+import static gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.discreteResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.unitAware;
@@ -43,13 +40,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MerlinExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
 class DiscreteEffectsTest {
-  {
-    // We need to initialize this up front, so we can use in-line initializers for other resources after.
-    // I think in-line initializers for the other resources make the tests easier to read.
-    Resources.init(Instant.EPOCH);
+  public DiscreteEffectsTest(final Registrar registrar) {
+    StreamlineSystem.testInit(registrar);
+
+    settable = discreteResource(42).notSaved().build();
+    flag = discreteResource(false).notSaved().build();
+    counter = discreteResource(0).notSaved().build();
+    consumable = discreteResource(10.0).notSaved().build();
+    nonconsumable = discreteResource(10.0).notSaved().build();
+    settableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
+    consumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
+    nonconsumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
   }
 
-  private final MutableResource<Discrete<Integer>> settable = discreteResource(42).notSaved().build();
+  private final MutableResource<Discrete<Integer>> settable;
 
   @Test
   void set_effect_changes_to_new_value() {
@@ -73,7 +77,7 @@ class DiscreteEffectsTest {
     assertEquals(789, currentValue(settable));
   }
 
-  private final MutableResource<Discrete<Boolean>> flag = discreteResource(false).notSaved().build();
+  private final MutableResource<Discrete<Boolean>> flag;
 
   @Test
   void flag_set_makes_value_true() {
@@ -97,7 +101,7 @@ class DiscreteEffectsTest {
     assertTrue(currentValue(flag));
   }
 
-  private final MutableResource<Discrete<Integer>> counter = discreteResource(0).notSaved().build();
+  private final MutableResource<Discrete<Integer>> counter;
 
   @Test
   void increment_increases_value_by_1() {
@@ -127,7 +131,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue - 3, currentValue(counter));
   }
 
-  private final MutableResource<Discrete<Double>> consumable = discreteResource(10.0).notSaved().build();
+  private final MutableResource<Discrete<Double>> consumable;
 
   @Test
   void consume_decreases_value_by_amount() {
@@ -152,7 +156,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue - 2.7 + 5.6, currentValue(consumable));
   }
 
-  private final MutableResource<Discrete<Double>> nonconsumable = discreteResource(10.0).notSaved().build();
+  private final MutableResource<Discrete<Double>> nonconsumable;
 
   @Test
   void using_decreases_value_while_action_is_running() {
@@ -192,7 +196,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue, currentValue(nonconsumable));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> settableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> settableDataVolume;
 
   @Test
   void unit_aware_set_converts_to_resource_unit() {
@@ -205,7 +209,7 @@ class DiscreteEffectsTest {
     assertThrows(IllegalArgumentException.class, () -> set(settableDataVolume, quantity(2, METER)));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> consumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> consumableDataVolume;
 
   @Test
   void unit_aware_consume_converts_to_resource_unit() {
@@ -233,7 +237,7 @@ class DiscreteEffectsTest {
     assertThrows(IllegalArgumentException.class, () -> restore(consumableDataVolume, quantity(1, METER)));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> nonconsumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> nonconsumableDataVolume;
 
   @Test
   void unit_aware_using_converts_to_resource_unit() {

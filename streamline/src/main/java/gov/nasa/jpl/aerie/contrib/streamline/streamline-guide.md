@@ -1092,7 +1092,7 @@ We'll also integrate the final output of the network, so we can track how much f
 ```java
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.registration.Registrar;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.*;

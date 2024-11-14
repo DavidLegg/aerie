@@ -12,7 +12,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 import java.util.Stack;
 import java.util.function.Supplier;
 
-import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
+import static gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem.currentTime;
 
 /**
  * Functions for debugging resources by tracing their calculation.

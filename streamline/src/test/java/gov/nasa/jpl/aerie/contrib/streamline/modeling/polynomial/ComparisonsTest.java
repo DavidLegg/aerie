@@ -1,10 +1,11 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
-import gov.nasa.jpl.aerie.contrib.streamline.core.Resources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
+import gov.nasa.jpl.aerie.merlin.framework.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.junit.jupiter.api.Test;
@@ -12,9 +13,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.time.Instant;
-
-import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.set;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
@@ -29,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MerlinExtension.class)
 @TestInstance(Lifecycle.PER_CLASS)
 public class ComparisonsTest {
-  public ComparisonsTest() {
-    Resources.init(Instant.EPOCH);
+  public ComparisonsTest(final Registrar registrar) {
+    StreamlineSystem.testInit(registrar);
 
     p = polynomialResource(0).notSaved().build();
     q = polynomialResource(0).notSaved().build();

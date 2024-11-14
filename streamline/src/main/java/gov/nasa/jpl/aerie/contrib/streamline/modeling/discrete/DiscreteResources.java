@@ -8,8 +8,6 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDy
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.DoubleUtils;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMapperUtils;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Unit;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
@@ -24,6 +22,7 @@ import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 
 import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem.simulationClock;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.testing;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;

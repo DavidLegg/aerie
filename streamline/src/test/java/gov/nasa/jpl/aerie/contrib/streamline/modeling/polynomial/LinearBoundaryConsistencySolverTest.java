@@ -1,7 +1,9 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial;
 
+import gov.nasa.jpl.aerie.contrib.streamline.StreamlineSystem;
 import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Domain;
+import gov.nasa.jpl.aerie.merlin.framework.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.junit.MerlinExtension;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.junit.jupiter.api.Nested;
@@ -9,8 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import java.time.Instant;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
@@ -31,8 +31,8 @@ class LinearBoundaryConsistencySolverTest {
     MutableResource<Polynomial> driver;
     Resource<Polynomial> result;
 
-    SingleVariableSingleConstraint() {
-      Resources.init(Instant.EPOCH);
+    SingleVariableSingleConstraint(final Registrar registrar) {
+      StreamlineSystem.testInit(registrar);
 
       driver = polynomialResource(10).notSaved().build();
 
@@ -73,8 +73,8 @@ class LinearBoundaryConsistencySolverTest {
     MutableResource<Polynomial> lowerBound1, lowerBound2, upperBound;
     Resource<Polynomial> result;
 
-    SingleVariableMultipleConstraint() {
-      Resources.init(Instant.EPOCH);
+    SingleVariableMultipleConstraint(final Registrar registrar) {
+      StreamlineSystem.testInit(registrar);
 
       lowerBound1 = polynomialResource(10).notSaved().build();
       lowerBound2 = polynomialResource(20).notSaved().build();
@@ -151,8 +151,8 @@ class LinearBoundaryConsistencySolverTest {
     MutableResource<Polynomial> driver;
     Resource<Polynomial> result;
 
-    ScalingConstraint() {
-      Resources.init(Instant.EPOCH);
+    ScalingConstraint(final Registrar registrar) {
+      StreamlineSystem.testInit(registrar);
 
       driver = polynomialResource(10).notSaved().build();
 
@@ -183,8 +183,8 @@ class LinearBoundaryConsistencySolverTest {
     MutableResource<Polynomial> upperBound, upperBoundOnC;
     Resource<Polynomial> a, b, c;
 
-    MultipleVariables() {
-      Resources.init(Instant.EPOCH);
+    MultipleVariables(final Registrar registrar) {
+      StreamlineSystem.testInit(registrar);
 
       upperBound = polynomialResource(10).notSaved().build();
       upperBoundOnC = polynomialResource(5).notSaved().build();
