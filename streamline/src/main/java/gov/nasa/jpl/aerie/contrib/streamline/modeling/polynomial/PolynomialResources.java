@@ -5,6 +5,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.CommutativityTestInp
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.ValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.black_box.*;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -16,8 +17,6 @@ import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAwareOperations;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAwareResources;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.DoubleUtils;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -30,7 +29,6 @@ import java.util.TreeMap;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.doubleArray;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.testing;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
@@ -86,7 +84,7 @@ public final class PolynomialResources {
                                       left.getCoefficient(i),
                                       right.getCoefficient(i)));
             })))
-            .dynamicsMapper(null /* TODO - use autovaluemapper */);
+            .dynamicsMapper(ValueMappers.polynomial());
   }
 
   public static MutableResourceBuilder<Polynomial> polynomialResource(double... initialCoefficients) {

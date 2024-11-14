@@ -3,14 +3,14 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks;
 import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.MutableResourceBuilder;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.ValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMapperUtils;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.time.Instant;
 
-import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.duration;
 import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.string;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
@@ -22,7 +22,7 @@ public final class InstantClockResources {
 
     public static MutableResourceBuilder<InstantClock> clock(Instant defaultValue) {
         return resource(new InstantClock(defaultValue))
-                .dynamicsMapper(ValueMappers.map(string(), InvertibleFunction.of($ -> new InstantClock(Instant.parse($)), $ -> $.extract().toString())));
+                .dynamicsMapper(ValueMappers.instantClock());
     }
 
     public static Resource<InstantClock> addToInstant(Instant zeroTime, Resource<Clock> relativeClock) {

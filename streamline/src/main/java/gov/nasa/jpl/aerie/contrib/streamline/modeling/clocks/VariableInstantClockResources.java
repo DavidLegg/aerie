@@ -1,11 +1,14 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.ValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import java.time.Instant;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.name;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.InstantClock.durationBetween;
@@ -13,6 +16,11 @@ import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteRe
 
 public final class VariableInstantClockResources {
     private VariableInstantClockResources() {}
+
+    public static MutableResource.MutableResourceBuilder<VariableInstantClock> variableClock(VariableInstantClock defaultValue) {
+        return resource(defaultValue)
+                .dynamicsMapper(ValueMappers.variableInstantClock());
+    }
 
     public static Resource<VariableClock> relativeTo(Resource<VariableInstantClock> clock, Resource<Discrete<Instant>> zeroTime) {
         return name(map(clock, zeroTime, (c, t) ->

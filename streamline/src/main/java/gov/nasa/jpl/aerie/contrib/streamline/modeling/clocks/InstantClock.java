@@ -13,10 +13,16 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.addToInstant;
  * A variation on {@link Clock} that represents an absolute {@link Instant}
  * instead of a relative {@link Duration}.
  */
-public record InstantClock(Instant extract) implements Dynamics<Instant, InstantClock> {
+@AutoValueMapper.Record
+public record InstantClock(Instant time) implements Dynamics<Instant, InstantClock> {
+    @Override
+    public Instant extract() {
+        return time;
+    }
+
     @Override
     public InstantClock step(Duration t) {
-        return new InstantClock(addToInstant(extract, t));
+        return new InstantClock(addToInstant(time, t));
     }
 
     // TODO - this method belongs somewhere else...

@@ -5,8 +5,8 @@ import gov.nasa.jpl.aerie.merlin.framework.ValueMapper;
 import gov.nasa.jpl.aerie.merlin.protocol.types.SerializedValue;
 import gov.nasa.jpl.aerie.merlin.protocol.types.ValueSchema;
 
-public final class ValueMappers {
-    private ValueMappers() {}
+public final class ValueMapperUtils {
+    private ValueMapperUtils() {}
 
     /**
      * Build a {@link ValueMapper} for U from one for T

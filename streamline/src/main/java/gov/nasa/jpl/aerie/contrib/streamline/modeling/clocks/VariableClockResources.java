@@ -5,6 +5,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.MutableResourceBuilder;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.ValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
@@ -26,7 +27,7 @@ public final class VariableClockResources {
 
   public static MutableResourceBuilder<VariableClock> variableClock(VariableClock defaultValue) {
     return resource(defaultValue)
-            .dynamicsMapper(null /* TODO */);
+            .dynamicsMapper(ValueMappers.variableClock());
   }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<VariableClock> clock, Resource<Discrete<Duration>> threshold) {

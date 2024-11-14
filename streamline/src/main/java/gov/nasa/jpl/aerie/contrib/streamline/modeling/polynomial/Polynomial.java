@@ -29,6 +29,7 @@ import static org.apache.commons.math3.analysis.polynomials.PolynomialsUtils.shi
  *
  * @apiNote The units of `t` are seconds
  */
+@AutoValueMapper.Record
 public record Polynomial(double[] coefficients) implements Dynamics<Double, Polynomial> {
 
   // TODO: Add Duration parameter for unit of formal parameter?

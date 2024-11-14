@@ -2,13 +2,14 @@ package gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.*;
 import gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.CommutativityTestInput;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.ValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.DoubleUtils;
 import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
-import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMapperUtils;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Unit;
 import gov.nasa.jpl.aerie.contrib.streamline.unit_aware.UnitAware;
@@ -92,7 +93,7 @@ public final class DiscreteResources {
     }
 
     public DiscreteResourceBuilder<T> valueMapper(final ValueMapper<T> mapper) {
-      return dynamicsMapper(ValueMappers.map(mapper, InvertibleFunction.of(Discrete::discrete, Discrete::extract)));
+      return dynamicsMapper(ValueMappers.discrete(mapper));
     }
   }
 
