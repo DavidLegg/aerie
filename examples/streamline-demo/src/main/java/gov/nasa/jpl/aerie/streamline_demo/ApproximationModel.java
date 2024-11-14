@@ -47,8 +47,8 @@ public class ApproximationModel {
   public ApproximationModel(final Registrar registrar, final Configuration config) {
     final double tolerance = config.approximationTolerance;
 
-    polynomial = polynomialResource(1);
-    divisor = polynomialResource(1);
+    polynomial = polynomialResource(1).name("approximation/polynomial").build();
+    divisor = polynomialResource(1).name("approximation/divisor").build();
 
     assumedLinear = assumeLinear(polynomial);
     defaultApproximation = approximateAsLinear(polynomial, tolerance);

@@ -1,9 +1,9 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock;
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.InstantClock;
 import gov.nasa.jpl.aerie.merlin.framework.Condition;
-import gov.nasa.jpl.aerie.merlin.framework.Scoped;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Unit;
 
@@ -21,7 +21,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Reactions.wheneverDynamicsChange;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Dependencies.addDependency;
 import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.*;
-import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.Clock.clock;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.InstantClockResources.addToInstant;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -37,16 +37,14 @@ public final class Resources {
    * Ensure that Resources are initialized.
    *
    * <p>
-   *   This method needs to be called during simulation initialization.
-   *   This method is idempotent; calling it multiple times is the same as calling it once.
+   *   This method needs to be called once during simulation initialization.
    * </p>
    */
   public static void init(Instant planStart) {
-    CLOCK = resource(clock(ZERO));
+    CLOCK = clock(ZERO).name("Global Simulation Clock").build();
     ABSOLUTE_CLOCK = name(addToInstant(planStart, CLOCK), "Global Absolute Simulation Clock");
   }
 
-  // TODO if Aerie provides either a `getElapsedTime` method or dynamic allocation of Cells, we can avoid this mutable static variable
   private static Resource<Clock> CLOCK;
   private static Resource<InstantClock> ABSOLUTE_CLOCK;
   public static Duration currentTime() {
@@ -222,7 +220,7 @@ public final class Resources {
    * </p>
    */
   public static <D extends Dynamics<?, D>> Resource<D> cache(Resource<D> resource) {
-    final var cell = resource(resource.getDynamics());
+    final var cell = resource(resource.getDynamics()).notSaved().build();
     forward(resource, cell);
     name(cell, "Cache (%s)", resource);
     return cell;
@@ -258,7 +256,7 @@ public final class Resources {
   // in favor of allowing resources to report expiry information directly.
   // This would be cleaner and potentially more performant.
   public static <D extends Dynamics<?, D>> Resource<D> signalling(Resource<D> resource) {
-    var cell = resource(discrete(Unit.UNIT));
+    var cell = resource(discrete(Unit.UNIT)).notSaved().build();
     name(cell, "Signal for (%s)", resource);
     wheneverDynamicsChange(resource, ignored -> cell.emit($ -> $));
     Resource<D> result = () -> {
@@ -271,14 +269,14 @@ public final class Resources {
     return result;
   }
 
-  public static <D extends Dynamics<?, D>> Resource<D> shift(Resource<D> resource, Duration interval, D initialDynamics) {
+  public static <D extends Dynamics<?, D>> Resource<D> shift(Resource<D> resource, Duration interval, D initialDynamics, String name) {
     if (interval.shorterThan(ZERO)) {
       throw new IllegalArgumentException("Cannot shift resource by negative interval: " + interval);
     }
     if (interval.equals(ZERO)) {
       return resource;
     }
-    var cell = resource(initialDynamics);
+    var cell = resource(initialDynamics).name(name).build();
     delayedSet(cell, resource.getDynamics(), interval);
     wheneverDynamicsChange(resource, newDynamics ->
         delayedSet(cell, newDynamics, interval));

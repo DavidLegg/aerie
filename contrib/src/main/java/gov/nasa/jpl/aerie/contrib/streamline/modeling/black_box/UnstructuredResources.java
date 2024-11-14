@@ -30,7 +30,9 @@ public final class UnstructuredResources {
 
   public static <A> Resource<Unstructured<A>> timeBased(Function<Duration, A> f) {
     // Put this in a cell so it'll be stepped up appropriately
-    return resource(Unstructured.timeBased(f));
+    // Note that the function given implicitly assumes that time is zero at construction,
+    // so there's no need to persist this across a fincon boundary.
+    return resource(Unstructured.timeBased(f)).notSaved().build();
   }
 
   public static <A, D extends Dynamics<A, D>> Resource<Unstructured<A>> asUnstructured(Resource<D> resource) {

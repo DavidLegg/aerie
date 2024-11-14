@@ -17,6 +17,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentData;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.LinearExpression.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.polynomialResource;
 import static gov.nasa.jpl.aerie.merlin.framework.ModelActions.*;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECONDS;
 import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.ZERO;
@@ -33,7 +34,7 @@ class LinearBoundaryConsistencySolverTest {
     SingleVariableSingleConstraint() {
       Resources.init(Instant.EPOCH);
 
-      driver = resource(polynomial(10));
+      driver = polynomialResource(10).notSaved().build();
 
       var solver = new LinearBoundaryConsistencySolver("SingleVariableSingleConstraint");
       var v = solver.variable("v", Domain::upperBound);
@@ -75,9 +76,9 @@ class LinearBoundaryConsistencySolverTest {
     SingleVariableMultipleConstraint() {
       Resources.init(Instant.EPOCH);
 
-      lowerBound1 = resource(polynomial(10));
-      lowerBound2 = resource(polynomial(20));
-      upperBound = resource(polynomial(30));
+      lowerBound1 = polynomialResource(10).notSaved().build();
+      lowerBound2 = polynomialResource(20).notSaved().build();
+      upperBound = polynomialResource(30).notSaved().build();
 
       var solver = new LinearBoundaryConsistencySolver("SingleVariableMultipleConstraint");
       var v = solver.variable("v", Domain::lowerBound);
@@ -153,7 +154,7 @@ class LinearBoundaryConsistencySolverTest {
     ScalingConstraint() {
       Resources.init(Instant.EPOCH);
 
-      driver = resource(polynomial(10));
+      driver = polynomialResource(10).notSaved().build();
 
       var solver = new LinearBoundaryConsistencySolver("ScalingConstraint");
       var v = solver.variable("v", Domain::upperBound);
@@ -185,8 +186,8 @@ class LinearBoundaryConsistencySolverTest {
     MultipleVariables() {
       Resources.init(Instant.EPOCH);
 
-      upperBound = resource(polynomial(10));
-      upperBoundOnC = resource(polynomial(5));
+      upperBound = polynomialResource(10).notSaved().build();
+      upperBoundOnC = polynomialResource(5).notSaved().build();
 
       var solver = new LinearBoundaryConsistencySolver("MultipleVariablesSingleConstraint");
       var a = solver.variable("a", Domain::upperBound);

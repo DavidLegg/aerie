@@ -12,7 +12,6 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.addToInstant;
  * A variation on {@link VariableClock} that represents an absolute {@link Instant}
  * instead of a relative {@link Duration}.
  */
-@AutoValueMapper.Record
 public record VariableInstantClock(Instant extract, int multiplier) implements Dynamics<Instant, VariableInstantClock> {
     @Override
     public VariableInstantClock step(Duration t) {

@@ -52,7 +52,7 @@ public final class Demo {
   // Unit-naive version of a model, to demonstrate some core concepts:
 
   // Consumable, continuous:
-  MutableResource<Polynomial> fuel_kg = polynomialResource(20.0);
+  MutableResource<Polynomial> fuel_kg = polynomialResource(20.0).name("fuel_kg").build();
   // Non-consumable, discrete:
   MutableResource<Discrete<Double>> power_w = discreteResource(120.0).name("power_w").build();
   // Atomic non-consumable:
@@ -64,7 +64,7 @@ public final class Demo {
 
   // Derived states:
   Resource<Discrete<OnOff>> derivedEnumSwitch = map(boolSwitch, b -> b ? OnOff.ON : OnOff.OFF);
-  Resource<Polynomial> batterySOC_J = integrate(asPolynomial(power_w), 100);
+  Resource<Polynomial> batterySOC_J = integrate(asPolynomial(power_w), 100, "batterySOC_J");
   Resource<Discrete<Double>> clampedPower_w = map(power_w, p -> p < 0 ? 0 : p);
   Resource<Polynomial> clampedBatterySOC_J = clamp(batterySOC_J, constant(0), constant(100));
   Resource<Discrete<Boolean>> lowPower = lessThan(batterySOC_J, 20);
@@ -95,12 +95,12 @@ public final class Demo {
   // Consumable, continuous:
   // CellResource<Polynomial> fuel_kg = polynomialCellResource(20.0);
   UnitAware<MutableResource<Polynomial>> fuel = unitAware(
-      polynomialResource(20.0), KILOGRAM);
+      polynomialResource(20.0).name("fuel").build(), KILOGRAM);
   // Non-consumable, discrete:
   UnitAware<MutableResource<Discrete<Double>>> power = DiscreteResources.unitAware(
       discreteResource(120.0).name("power").build(), WATT);
 
-  UnitAware<Resource<Polynomial>> batterySOC = integrate(asUnitAwarePolynomial(power), quantity(100, JOULE));
+  UnitAware<Resource<Polynomial>> batterySOC = integrate(asUnitAwarePolynomial(power), quantity(100, JOULE), "batterySOC");
   UnitAware<Resource<Discrete<Double>>> clampedPower = DiscreteResources.unitAware(map(power.value(WATT), p -> p < 0 ? 0 : p), WATT);
   UnitAware<Resource<Discrete<Double>>> clampedPower_v2 = /* map(power, p -> lessThan(p, quantity(0, WATT)) ? quantity(0, WATT) : p) */
       null;
@@ -122,8 +122,8 @@ public final class Demo {
 
   // Example of using unstructured resources + approximation to represent functions that aren't
   // easily represented by analytic derivations
-  Resource<Polynomial> p = polynomialResource(1, 2, 3);
-  Resource<Polynomial> q = polynomialResource(6, 5, 4);
+  Resource<Polynomial> p = polynomialResource(1, 2, 3).name("p").build();
+  Resource<Polynomial> q = polynomialResource(6, 5, 4).name("q").build();
   Resource<Unstructured<Double>> quotient = UnstructuredResourceApplicative.map(asUnstructured(p), asUnstructured(q), (p$, q$) -> p$ / q$);
   Resource<Linear> approxQuotient = approximate(quotient, secantApproximation(IntervalFunctions.<Unstructured<Double>>byBoundingError(
       1e-6, Duration.SECOND, Duration.HOUR.times(24), errorByOptimization())));

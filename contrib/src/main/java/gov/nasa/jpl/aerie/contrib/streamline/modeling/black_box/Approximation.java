@@ -35,7 +35,7 @@ public final class Approximation {
       Resource<D> resource, Function<Expiring<D>, Expiring<E>> approximation) {
     // We should, in general, not care about saving the state of an approximation.
     // Instead, we should restore the underlying resource and re-approximate
-    var result = resource(notSaving(resource.getDynamics().map(approximation)));
+    var result = resource(resource.getDynamics().map(approximation)).notSaved().build();
     // Register the "updates" and "expires" conditions separately
     // so that the "updates" condition isn't triggered spuriously.
     wheneverUpdates(resource, newResourceDynamics -> updateApproximation(newResourceDynamics, approximation, result));

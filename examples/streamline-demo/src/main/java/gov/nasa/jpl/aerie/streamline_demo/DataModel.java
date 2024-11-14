@@ -11,16 +11,17 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResou
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.eraseExpiry;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.forward;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.debugging.Naming.name;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.choose;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.Comparison.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.LinearBoundaryConsistencySolver.LinearExpression.lx;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.*;
 
 public class DataModel {
-  public MutableResource<Polynomial> desiredRateA = PolynomialResources.polynomialResource(0);
-  public MutableResource<Polynomial> desiredRateB = PolynomialResources.polynomialResource(0);
-  public MutableResource<Polynomial> desiredRateC = PolynomialResources.polynomialResource(0);
-  public MutableResource<Polynomial> upperBoundOnTotalVolume = PolynomialResources.polynomialResource(10);
+  public MutableResource<Polynomial> desiredRateA = polynomialResource(0).name("desiredRateA").build();
+  public MutableResource<Polynomial> desiredRateB = polynomialResource(0).name("desiredRateB").build();
+  public MutableResource<Polynomial> desiredRateC = polynomialResource(0).name("desiredRateC").build();
+  public MutableResource<Polynomial> upperBoundOnTotalVolume = polynomialResource(10).name("maxVolume").build();
 
   public Resource<Polynomial> actualRateA, actualRateB, actualRateC;
   public MutableResource<Polynomial> volumeA, volumeB, volumeC;
@@ -32,17 +33,17 @@ public class DataModel {
 
     // Set up the rate solver
     var rateSolver = new LinearBoundaryConsistencySolver("DataModel Rate Solver");
-    var rateA = rateSolver.variable("rateA", Domain::upperBound);
-    var rateB = rateSolver.variable("rateB", Domain::upperBound);
-    var rateC = rateSolver.variable("rateC", Domain::upperBound);
+    var rateA = rateSolver.variable("actualRateA", Domain::upperBound);
+    var rateB = rateSolver.variable("actualRateB", Domain::upperBound);
+    var rateC = rateSolver.variable("actualRateC", Domain::upperBound);
     this.actualRateA = rateA.resource();
     this.actualRateB = rateB.resource();
     this.actualRateC = rateC.resource();
 
     // Use a simple feedback loop on volumes to do the integration and clamping.
-    this.volumeA = PolynomialResources.polynomialResource(0);
-    this.volumeB = PolynomialResources.polynomialResource(0);
-    this.volumeC = PolynomialResources.polynomialResource(0);
+    this.volumeA = polynomialResource(0).name("volumeA").build();
+    this.volumeB = polynomialResource(0).name("volumeB").build();
+    this.volumeC = polynomialResource(0).name("volumeC").build();
     var clampedVolumeA = clamp(this.volumeA, constant(0), upperBoundOnTotalVolume);
     var volumeB_ub = subtract(upperBoundOnTotalVolume, clampedVolumeA);
     var clampedVolumeB = clamp(this.volumeB, constant(0), volumeB_ub);
@@ -57,7 +58,7 @@ public class DataModel {
     forward(eraseExpiry(correctedVolumeC), this.volumeC);
 
     // Integrate the actual rates.
-    totalVolume = add(this.volumeA, this.volumeB, this.volumeC);
+    totalVolume = name(add(this.volumeA, this.volumeB, this.volumeC), "totalVolume");
 
     // Then use the solver to adjust the actual rates
 
@@ -89,18 +90,18 @@ public class DataModel {
   }
 
   private void registerStates(Registrar registrar, Configuration config) {
-    registrar.real("desiredRateA", assumeLinear(desiredRateA));
-    registrar.real("desiredRateB", assumeLinear(desiredRateB));
-    registrar.real("desiredRateC", assumeLinear(desiredRateC));
+    registrar.real(assumeLinear(desiredRateA));
+    registrar.real(assumeLinear(desiredRateB));
+    registrar.real(assumeLinear(desiredRateC));
 
-    registrar.real("actualRateA", assumeLinear(actualRateA));
-    registrar.real("actualRateB", assumeLinear(actualRateB));
-    registrar.real("actualRateC", assumeLinear(actualRateC));
+    registrar.real(assumeLinear(actualRateA));
+    registrar.real(assumeLinear(actualRateB));
+    registrar.real(assumeLinear(actualRateC));
 
-    registrar.real("volumeA", assumeLinear(volumeA));
-    registrar.real("volumeB", assumeLinear(volumeB));
-    registrar.real("volumeC", assumeLinear(volumeC));
-    registrar.real("totalVolume", assumeLinear(totalVolume));
-    registrar.real("maxVolume", assumeLinear(upperBoundOnTotalVolume));
+    registrar.real(assumeLinear(volumeA));
+    registrar.real(assumeLinear(volumeB));
+    registrar.real(assumeLinear(volumeC));
+    registrar.real(assumeLinear(totalVolume));
+    registrar.real(assumeLinear(upperBoundOnTotalVolume));
   }
 }

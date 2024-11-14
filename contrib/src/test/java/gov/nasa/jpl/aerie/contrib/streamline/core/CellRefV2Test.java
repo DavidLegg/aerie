@@ -14,6 +14,7 @@ import java.time.Instant;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.autoEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.commutingEffects;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.CellRefV2.noncommutingEffects;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.monads.DiscreteDynamicsMonad.effect;
@@ -29,7 +30,7 @@ class MutableResourceTest {
   class NonCommutingEffects {
     public NonCommutingEffects(final Registrar registrar) {
       Resources.init(Instant.EPOCH);
-      cell = MutableResource.resource(discrete(42), noncommutingEffects());
+      cell = resource(discrete(42)).notSaved().effectTrait(noncommutingEffects()).build();
     }
 
     private final MutableResource<Discrete<Integer>> cell;
@@ -69,7 +70,7 @@ class MutableResourceTest {
   class CommutingEffects {
     public CommutingEffects(final Registrar registrar) {
       Resources.init(Instant.EPOCH);
-      cell = MutableResource.resource(discrete(42), commutingEffects());
+      cell = resource(discrete(42)).notSaved().effectTrait(commutingEffects()).build();
     }
 
     private final MutableResource<Discrete<Integer>> cell;
@@ -113,7 +114,7 @@ class MutableResourceTest {
   class AutoEffects {
     public AutoEffects() {
       Resources.init(Instant.EPOCH);
-      cell = MutableResource.resource(discrete(42), autoEffects());
+      cell = resource(discrete(42)).notSaved().effectTrait(autoEffects()).build();
     }
 
     private final MutableResource<Discrete<Integer>> cell;
@@ -141,8 +142,6 @@ class MutableResourceTest {
     @Test
     void applies_commuting_concurrent_effects() {
       int initialValue = currentValue(cell);
-      // These effects do not in fact commute,
-      // but the point of the commutingEffects is that it *doesn't* check.
       spawn(() -> cell.emit(effect(n -> 3 * n)));
       spawn(() -> cell.emit(effect(n -> 4 * n)));
       delay(ZERO);

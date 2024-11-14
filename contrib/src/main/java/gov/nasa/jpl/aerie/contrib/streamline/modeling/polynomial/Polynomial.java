@@ -4,6 +4,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ExpiringMonad;
+import gov.nasa.jpl.aerie.merlin.framework.annotations.AutoValueMapper;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import org.apache.commons.math3.analysis.solvers.LaguerreSolver;

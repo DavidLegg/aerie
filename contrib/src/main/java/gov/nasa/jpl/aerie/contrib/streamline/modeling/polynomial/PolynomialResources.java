@@ -72,36 +72,29 @@ public final class PolynomialResources {
     return result;
   }
 
-  public static PolynomialResourceBuilder polynomialResource() {
-    return new PolynomialResourceBuilder();
+  public static MutableResourceBuilder<Polynomial> polynomialResource() {
+    return MutableResource.<Polynomial>resource()
+            // By default, polynomial resources are compared using a toleranced equality applied to every coefficient.
+            .effectTrait(autoEffects(testing((CommutativityTestInput<Polynomial> input) -> {
+              Polynomial original = input.original();
+              Polynomial left = input.leftResult();
+              Polynomial right = input.rightResult();
+              return left.degree() == right.degree() &&
+                      IntStream.rangeClosed(0, left.degree()).allMatch(
+                              i -> DoubleUtils.areEqualResults(
+                                      original.getCoefficient(i),
+                                      left.getCoefficient(i),
+                                      right.getCoefficient(i)));
+            })))
+            .dynamicsMapper(null /* TODO - use autovaluemapper */);
   }
 
-  public static PolynomialResourceBuilder polynomialResource(double... initialCoefficients) {
+  public static MutableResourceBuilder<Polynomial> polynomialResource(double... initialCoefficients) {
     return polynomialResource(polynomial(initialCoefficients));
   }
 
-  public static PolynomialResourceBuilder polynomialResource(Polynomial initialDynamics) {
+  public static MutableResourceBuilder<Polynomial> polynomialResource(Polynomial initialDynamics) {
     return polynomialResource().defaultValue(initialDynamics);
-  }
-
-  public static class PolynomialResourceBuilder extends BaseMutableResourceBuilder<Polynomial, PolynomialResourceBuilder> {
-    public PolynomialResourceBuilder() {
-      // By default, polynomial resources are compared using a toleranced equality applied to every coefficient.
-      effectTrait(autoEffects(testing(
-              (CommutativityTestInput<Polynomial> input) -> {
-                Polynomial original = input.original();
-                Polynomial left = input.leftResult();
-                Polynomial right = input.rightResult();
-                return left.degree() == right.degree() &&
-                        IntStream.rangeClosed(0, left.degree()).allMatch(
-                                i -> DoubleUtils.areEqualResults(
-                                        original.getCoefficient(i),
-                                        left.getCoefficient(i),
-                                        right.getCoefficient(i)));
-              })));
-      // Since a Polynomial is "just" its coefficients, just use the coefficients' value mapper for polynomials.
-      dynamicsMapper(ValueMappers.map(doubleArray(), InvertibleFunction.of(Polynomial::polynomial, Polynomial::coefficients)));
-    }
   }
 
   /**
@@ -521,7 +514,7 @@ public final class PolynomialResources {
    */
   public static Resource<Polynomial> movingAverage(Resource<Polynomial> p, Duration interval, String name) {
     var pIntegral = integrate(p, 0, name + "-operand-integral");
-    var shiftedIntegral = shift(pIntegral, interval, polynomial(0));
+    var shiftedIntegral = shift(pIntegral, interval, polynomial(0), name + "-shifted-operand-integral");
     var result = divide(subtract(pIntegral, shiftedIntegral), DiscreteResourceMonad.pure(interval.ratioOver(SECOND)));
     name(result, name);
     return result;

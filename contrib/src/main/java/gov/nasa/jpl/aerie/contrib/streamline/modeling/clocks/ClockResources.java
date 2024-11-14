@@ -1,12 +1,18 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks;
 
+import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.MutableResourceBuilder;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.InvertibleFunction;
+import gov.nasa.jpl.aerie.contrib.streamline.utils.ValueMappers;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
+import static gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers.duration;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
@@ -16,6 +22,11 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.EPSILON;
 
 public final class ClockResources {
   private ClockResources() {}
+
+  public static MutableResourceBuilder<Clock> clock(Duration defaultValue) {
+    return resource(Clock.clock(defaultValue))
+            .dynamicsMapper(ValueMappers.map(duration(), InvertibleFunction.of(Clock::new, Clock::extract)));
+  }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<Clock> clock, Resource<Discrete<Duration>> threshold) {
     return signalling(bind(clock, threshold, (Clock c, Discrete<Duration> t) -> {

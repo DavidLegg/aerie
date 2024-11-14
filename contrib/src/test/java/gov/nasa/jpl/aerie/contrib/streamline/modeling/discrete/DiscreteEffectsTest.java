@@ -17,8 +17,10 @@ import java.time.Instant;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentTime;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.currentValue;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks.ClockResources.clock;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete.discrete;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteEffects.*;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.discreteResource;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.DiscreteResources.unitAware;
 import static gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Quantities.add;
 import static gov.nasa.jpl.aerie.contrib.streamline.unit_aware.Quantities.quantity;
@@ -47,7 +49,7 @@ class DiscreteEffectsTest {
     Resources.init(Instant.EPOCH);
   }
 
-  private final MutableResource<Discrete<Integer>> settable = resource(discrete(42));
+  private final MutableResource<Discrete<Integer>> settable = discreteResource(42).notSaved().build();
 
   @Test
   void set_effect_changes_to_new_value() {
@@ -71,7 +73,7 @@ class DiscreteEffectsTest {
     assertEquals(789, currentValue(settable));
   }
 
-  private final MutableResource<Discrete<Boolean>> flag = resource(discrete(false));
+  private final MutableResource<Discrete<Boolean>> flag = discreteResource(false).notSaved().build();
 
   @Test
   void flag_set_makes_value_true() {
@@ -95,7 +97,7 @@ class DiscreteEffectsTest {
     assertTrue(currentValue(flag));
   }
 
-  private final MutableResource<Discrete<Integer>> counter = resource(discrete(0));
+  private final MutableResource<Discrete<Integer>> counter = discreteResource(0).notSaved().build();
 
   @Test
   void increment_increases_value_by_1() {
@@ -125,7 +127,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue - 3, currentValue(counter));
   }
 
-  private final MutableResource<Discrete<Double>> consumable = resource(discrete(10.0));
+  private final MutableResource<Discrete<Double>> consumable = discreteResource(10.0).notSaved().build();
 
   @Test
   void consume_decreases_value_by_amount() {
@@ -150,7 +152,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue - 2.7 + 5.6, currentValue(consumable));
   }
 
-  private final MutableResource<Discrete<Double>> nonconsumable = resource(discrete(10.0));
+  private final MutableResource<Discrete<Double>> nonconsumable = discreteResource(10.0).notSaved().build();
 
   @Test
   void using_decreases_value_while_action_is_running() {
@@ -161,7 +163,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue, currentValue(nonconsumable));
   }
 
-  MutableResource<Clock> DEBUG_clock = resource(new Clock(ZERO));
+  MutableResource<Clock> DEBUG_clock = clock(ZERO).notSaved().build();
 
   @Test
   void using_runs_synchronously() {
@@ -190,7 +192,7 @@ class DiscreteEffectsTest {
     assertEquals(initialValue, currentValue(nonconsumable));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> settableDataVolume = unitAware(resource(discrete(10.0)), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> settableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
 
   @Test
   void unit_aware_set_converts_to_resource_unit() {
@@ -203,7 +205,7 @@ class DiscreteEffectsTest {
     assertThrows(IllegalArgumentException.class, () -> set(settableDataVolume, quantity(2, METER)));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> consumableDataVolume = unitAware(resource(discrete(10.0)), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> consumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
 
   @Test
   void unit_aware_consume_converts_to_resource_unit() {
@@ -231,7 +233,7 @@ class DiscreteEffectsTest {
     assertThrows(IllegalArgumentException.class, () -> restore(consumableDataVolume, quantity(1, METER)));
   }
 
-  UnitAware<MutableResource<Discrete<Double>>> nonconsumableDataVolume = unitAware(resource(discrete(10.0)), BIT);
+  UnitAware<MutableResource<Discrete<Double>>> nonconsumableDataVolume = unitAware(discreteResource(10.0).notSaved().build(), BIT);
 
   @Test
   void unit_aware_using_converts_to_resource_unit() {

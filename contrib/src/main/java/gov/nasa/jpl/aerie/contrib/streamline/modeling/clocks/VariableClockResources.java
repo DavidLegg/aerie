@@ -1,6 +1,8 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.clocks;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
+import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource;
+import gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.MutableResourceBuilder;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Resource;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.modeling.discrete.Discrete;
@@ -9,6 +11,7 @@ import gov.nasa.jpl.aerie.contrib.streamline.modeling.linear.Linear;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
+import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resource;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Resources.signalling;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.bind;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.map;
@@ -20,6 +23,11 @@ import static gov.nasa.jpl.aerie.merlin.protocol.types.Duration.SECOND;
 
 public final class VariableClockResources {
   private VariableClockResources() {}
+
+  public static MutableResourceBuilder<VariableClock> variableClock(VariableClock defaultValue) {
+    return resource(defaultValue)
+            .dynamicsMapper(null /* TODO */);
+  }
 
   public static Resource<Discrete<Boolean>> lessThan(Resource<VariableClock> clock, Resource<Discrete<Duration>> threshold) {
     // Since Duration is an integral type, implement strictness through EPSILON stepping

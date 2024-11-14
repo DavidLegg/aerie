@@ -32,8 +32,8 @@ public class ComparisonsTest {
   public ComparisonsTest() {
     Resources.init(Instant.EPOCH);
 
-    p = resource(polynomial(0));
-    q = resource(polynomial(0));
+    p = polynomialResource(0).notSaved().build();
+    q = polynomialResource(0).notSaved().build();
 
     p_lt_q = lessThan(p, q);
     p_lte_q = lessThanOrEquals(p, q);

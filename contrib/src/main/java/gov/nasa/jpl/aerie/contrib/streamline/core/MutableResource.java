@@ -39,6 +39,15 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     return new MutableResourceBuilder<>();
   }
 
+  // Add default value overloads, because these specify the type parameter for us, which is often cleaner.
+  static <D extends Dynamics<?, D>> MutableResourceBuilder<D> resource(final D defaultValue) {
+    return MutableResource.<D>resource().defaultValue(defaultValue);
+  }
+
+  static <D extends Dynamics<?, D>> MutableResourceBuilder<D> resource(final ErrorCatching<Expiring<D>> defaultValue) {
+    return MutableResource.<D>resource().defaultValue(defaultValue);
+  }
+
   class MutableResourceBuilder<D extends Dynamics<?, D>> extends BaseMutableResourceBuilder<D, MutableResourceBuilder<D>> {}
 
   class BaseMutableResourceBuilder<D extends Dynamics<?, D>, Self extends BaseMutableResourceBuilder<D, Self>> {

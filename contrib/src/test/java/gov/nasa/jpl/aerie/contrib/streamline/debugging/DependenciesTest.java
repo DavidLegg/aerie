@@ -17,6 +17,7 @@ import static gov.nasa.jpl.aerie.contrib.streamline.core.MutableResource.resourc
 import static gov.nasa.jpl.aerie.contrib.streamline.core.monads.ResourceMonad.*;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.Polynomial.polynomial;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.constant;
+import static gov.nasa.jpl.aerie.contrib.streamline.modeling.polynomial.PolynomialResources.polynomialResource;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Nested
@@ -29,7 +30,7 @@ class DependenciesTest {
     constantTrue = DiscreteResources.constant(true);
     constant1234 = constant(1234);
     constant5678 = constant(5678);
-    polynomialCell = resource(polynomial(1));
+    polynomialCell = polynomialResource(1).notSaved().build();
     derived = map(constantTrue, constant1234, constant5678,
                                        (b, x, y) -> b.extract() ? x : y);
   }
