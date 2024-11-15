@@ -49,10 +49,10 @@ public class StreamlineSystem {
             InitialConditions initialConditions,
             Consumer<Map<String, SerializedValue>> finconHandler
     ) {
+        Logging.init(baseRegistrar);
         InitialConditionManager.init(initialConditions, finconHandler);
         var registrar = new gov.nasa.jpl.aerie.contrib.streamline.modeling.registration.Registrar(baseRegistrar, planStart, errorBehavior);
         Registration.init(registrar);
-        Logging.init(baseRegistrar);
 
         CLOCK = clock(ZERO).name("Global Simulation Clock").build();
         ABSOLUTE_CLOCK = clock(planStart).name("Global Absolute Simulation Clock").build();

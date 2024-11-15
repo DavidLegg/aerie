@@ -158,7 +158,7 @@ public final class PolynomialResources {
                         p.degree()));
       }
     });
-    name(result, "%s");
+    name(result, "%s", polynomial);
     return result;
   }
 

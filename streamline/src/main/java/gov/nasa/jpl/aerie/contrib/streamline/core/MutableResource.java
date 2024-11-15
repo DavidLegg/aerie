@@ -1,5 +1,7 @@
 package gov.nasa.jpl.aerie.contrib.streamline.core;
 
+import gov.nasa.jpl.aerie.contrib.serialization.mappers.NullableValueMapper;
+import gov.nasa.jpl.aerie.contrib.serialization.rulesets.BasicValueMappers;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.DynamicsMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.core.monads.ErrorCatchingMonad;
 import gov.nasa.jpl.aerie.contrib.streamline.debugging.Context;
@@ -13,6 +15,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 import gov.nasa.jpl.aerie.merlin.protocol.types.SerializedValue;
 import gov.nasa.jpl.aerie.merlin.protocol.types.ValueSchema;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -160,7 +163,7 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
     return new ValueMapper<>() {
       @Override
       public ValueSchema getValueSchema() {
-        // Note: Both errorMessage and expiry are nullable.
+        // Note: Both errorMessage and expiry are optional & nullable.
         return ValueSchema.ofStruct(Map.of(
                 "error", ValueSchema.STRING,
                 "expiry", ValueSchema.DURATION,
@@ -170,10 +173,13 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
       @Override
       public SerializedValue serializeValue(ErrorCatching<Expiring<D>> value) {
         return value.match(
-                success -> SerializedValue.of(Map.of(
-                        "expiry", success.expiry().value().map(duration()::serializeValue).orElse(SerializedValue.NULL),
-                        "dynamics", baseMapper.serializeValue(success.data())
-                )),
+                success -> {
+                    var map = new HashMap<String, SerializedValue>();
+                    map.put("dynamics", baseMapper.serializeValue(success.data()));
+                    success.expiry().value().ifPresent(expiry ->
+                            map.put("expiry", duration().serializeValue(expiry)));
+                    return SerializedValue.of(map);
+                },
                 error -> SerializedValue.of(Map.of(
                         "error", SerializedValue.of(error.getMessage())
                 ))
@@ -188,7 +194,7 @@ public interface MutableResource<D extends Dynamics<?, D>> extends Resource<D> {
             return Result.success(ErrorCatching.failure(new Exception(map.get("error").asString().orElseThrow())));
           } else {
             var expiry = expiry(Optional.ofNullable(map.get("expiry"))
-                    .map($ -> duration().deserializeValue($).getSuccessOrThrow()));
+                    .map($ -> new NullableValueMapper<>(duration()).deserializeValue($).getSuccessOrThrow()));
             var dynamics = baseMapper.deserializeValue(map.get("dynamics")).getSuccessOrThrow();
             return Result.success(ErrorCatching.success(Expiring.expiring(dynamics, expiry)));
           }

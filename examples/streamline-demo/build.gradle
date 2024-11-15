@@ -42,6 +42,7 @@ dependencies {
 
   implementation project(':streamline')
 
+  api 'org.glassfish:javax.json:1.1.4'
 
   testImplementation project(':merlin-framework-junit')
   testImplementation 'org.assertj:assertj-core:3.23.1'

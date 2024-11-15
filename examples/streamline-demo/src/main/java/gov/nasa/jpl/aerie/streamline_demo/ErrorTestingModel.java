@@ -17,10 +17,10 @@ public class ErrorTestingModel {
   public MutableResource<Discrete<Boolean>> bool = discreteResource(true).name("errorTesting/bool").build();
   public MutableResource<Discrete<Integer>> counter = discreteResource(5).name("errorTesting/counter").build();
   public MutableResource<Polynomial> continuous = polynomialResource(1).name("errorTesting/continuous").build();
-  public Resource<Polynomial> derived = multiply(
+  public Resource<Polynomial> derived = name(multiply(
       continuous,
       asPolynomial(map(counter, c -> (double) c)),
-      asPolynomial(map(bool, $ -> $ ? 1.0 : -1.0)));
+      asPolynomial(map(bool, $ -> $ ? 1.0 : -1.0))), "errorTesting/derived");
 
   public MutableResource<Polynomial> upperBound = polynomialResource(5).name("errorTesting/upperBound").build();
   public MutableResource<Polynomial> lowerBound = polynomialResource(-5).name("errorTesting/lowerBound").build();

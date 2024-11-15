@@ -16,4 +16,9 @@ public final class Configuration {
   @Parameter
   public Duration profilingDumpTime = Duration.ZERO;
 
+  @Parameter
+  public String inconFormat = "/fincons/streamline-demo.%s.json";
+
+  @Parameter
+  public String finconFormat = inconFormat;
 }
