@@ -9,14 +9,16 @@ public final class Mission {
   public final DataModel dataModel;
   public final ErrorTestingModel errorTestingModel;
   public final ApproximationModel approximationModel;
+  public final CsrModel csrModel;
 
   public Mission(final gov.nasa.jpl.aerie.merlin.framework.Registrar registrar$, final Configuration config) {
-    var registrar = new Registrar(registrar$, Registrar.ErrorBehavior.Log);
+    var registrar = new Registrar(registrar$, config.errorBehavior);
     if (config.traceResources) registrar.setTrace();
     if (config.profileResources) Resource.profileAllResources();
     dataModel = new DataModel(registrar, config);
     errorTestingModel = new ErrorTestingModel(registrar, config);
     approximationModel = new ApproximationModel(registrar, config);
+    csrModel = new CsrModel(registrar, config);
     if (config.profilingDumpTime.isPositive()) {
       ModelActions.defer(config.profilingDumpTime, Profiling::dump);
     }

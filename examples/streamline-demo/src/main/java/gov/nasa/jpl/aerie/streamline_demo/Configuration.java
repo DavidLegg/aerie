@@ -1,5 +1,6 @@
 package gov.nasa.jpl.aerie.streamline_demo;
 
+import gov.nasa.jpl.aerie.contrib.streamline.modeling.Registrar;
 import gov.nasa.jpl.aerie.merlin.framework.annotations.Export.Parameter;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
@@ -16,4 +17,6 @@ public final class Configuration {
   @Parameter
   public Duration profilingDumpTime = Duration.ZERO;
 
+  @Parameter
+  public Registrar.ErrorBehavior errorBehavior = Registrar.ErrorBehavior.Log;
 }
