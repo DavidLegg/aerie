@@ -34,6 +34,10 @@ public record Expiry(Optional<Duration> value) implements Comparable<Expiry> {
     return expiry(value().map(v -> v.minus(t)));
   }
 
+  public Expiry plus(Duration t) {
+    return expiry(value().map(v -> v.plus(t)));
+  }
+
   public boolean isNever() {
     return value().isEmpty();
   }
