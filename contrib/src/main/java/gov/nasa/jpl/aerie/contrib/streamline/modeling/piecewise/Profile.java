@@ -48,6 +48,10 @@ public class Profile<D> {
         return projection.dynamics == history.dynamics;
     }
 
+    public D extract() {
+        return projection.dynamics;
+    }
+
     public Profile<D> step(Duration t) {
         if (t.isZero()) {
             return this;

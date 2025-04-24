@@ -25,6 +25,8 @@ TARGETS = [
     applicative('Resource<Unstructured<{}>>', '../modeling/black_box/monads/UnstructuredResourceApplicative.java'),
     applicative('ErrorCatching<Expiring<Unstructured<{}>>>', '../modeling/black_box/monads/UnstructuredDynamicsApplicative.java'),
     monad('Profile<{}>', '../modeling/piecewise/monads/ProfileMonad.java'),
+    monad('ErrorCatching<Profile<{}>>', '../modeling/piecewise/monads/ProfileDynamicsMonad.java'),
+    monad('ProfileResource<{}>', '../modeling/piecewise/monads/ProfileResourceMonad.java'),
 ]
 
 
