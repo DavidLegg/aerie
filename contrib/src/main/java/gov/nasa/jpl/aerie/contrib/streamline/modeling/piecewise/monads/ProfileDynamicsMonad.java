@@ -13,6 +13,15 @@ import java.util.function.Function;
 
 import static gov.nasa.jpl.aerie.contrib.streamline.utils.FunctionalUtils.curry;
 
+/*
+    Notes:
+
+    This class and the classes that use it define resource dynamics as ErrorCatching<Profile<D>>.
+    However, it might be more natural to use Profile<ErrorCatching<D>>, to allow for holes in the profile without blowing up the entire thing.
+    It might require a little more threading through the monad structures, though, as we won't have Profile directly touching the dynamics object...
+    Maybe we could adapt the "regularize" method to instead accept a stepping function, and pass Dynamics::step through ErrorCatchingMonad.map...
+ */
+
 public final class ProfileDynamicsMonad {
     private ProfileDynamicsMonad() {}
 
@@ -32,14 +41,11 @@ public final class ProfileDynamicsMonad {
         return ErrorCatchingMonad.map(ErrorCatchingMonad.join(ErrorCatchingMonad.map(a, ProfileDynamicsMonad::distribute)), ProfileMonad::join);
     }
 
-    // Not fully monadic since we intentionally throw away the projection, but useful nonetheless.
+    // Not fully monadic since we intentionally throw away the history, but useful nonetheless.
 
     public static <A extends Dynamics<?, A>> ProfileDynamicsEffect<A> effect(Function<A, A> f) {
-        return bindEffect(f.andThen(ProfileDynamicsMonad::pure));
-    }
-
-    public static <A extends Dynamics<?, A>> ProfileDynamicsEffect<A> bindEffect(Function<A, ErrorCatching<Profile<A>>> f) {
-        return ea -> ErrorCatchingMonad.bind(ea, a -> f.apply(a.extract()));
+        // Apply an effect on the future part of the profile by mapping over the projection segments.
+        return a -> ErrorCatchingMonad.map(a, profile -> profile.splice(ProfileMonad.map(profile, f)));
     }
 
     // GENERATED CODE START

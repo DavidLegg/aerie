@@ -6,6 +6,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.CellType;
 import gov.nasa.jpl.aerie.merlin.protocol.model.EffectTrait;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
+import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
 

@@ -1,12 +1,16 @@
 package gov.nasa.jpl.aerie.contrib.streamline.modeling.piecewise;
 
 import gov.nasa.jpl.aerie.contrib.streamline.core.Dynamics;
+import gov.nasa.jpl.aerie.contrib.streamline.core.Expiring;
 import gov.nasa.jpl.aerie.contrib.streamline.core.Expiry;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 
+import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
+import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiring.expiring;
 import static gov.nasa.jpl.aerie.contrib.streamline.core.Expiry.NEVER;
 import static gov.nasa.jpl.aerie.contrib.streamline.modeling.piecewise.Lazy.eager;
 
@@ -48,8 +52,35 @@ public class Profile<D> {
         return projection.dynamics == history.dynamics;
     }
 
-    public D extract() {
-        return projection.dynamics;
+    /**
+     * Get the dynamics active "now", at the time when this profile is anchored.
+     */
+    public Expiring<D> dynamics() {
+        return expiring(projection.dynamics, projection.expiry);
+    }
+
+    /**
+     * View the projection of this profile into the future as a (potentially infinite) stream of segments.
+     * Each segments' dynamics object reflects its state at the start of that segment,
+     * and can be stepped forward to obtain the state during that segment.
+     * The first segment starts "now", the time when the profile is anchored,
+     * and each subsequent segment starts when the prior segment expires.
+     */
+    public Stream<Expiring<D>> projection() {
+        return Stream.iterate(projection, s -> !s.expiry.isNever(), s -> s.next.get())
+                .map(s -> expiring(s.dynamics, s.expiry));
+    }
+
+    /**
+     * View the history of this profile in the past as a (potentially infinite) stream of segments.
+     * Each segments' dynamics object reflects its state at the end of that segment,
+     * and can be stepped backward to obtain the state during that segment.
+     * The first segment ends "now", the time when the profile is anchored,
+     * and each subsequent segment ends when the prior segment expires (going back in time).
+     */
+    public Stream<Expiring<D>> history() {
+        return Stream.iterate(history, s -> !s.expiry.isNever(), s -> s.next.get())
+                .map(s -> expiring(s.dynamics, s.expiry));
     }
 
     public Profile<D> step(Duration t) {
@@ -100,6 +131,13 @@ public class Profile<D> {
         return new Profile<>(
                 Segment.join(profile.projection.map($ -> $.projection)),
                 Segment.join(profile.history.map($ -> $.history)));
+    }
+
+    /**
+     * Splice the history of this profile together with the projection of another profile.
+     */
+    public Profile<D> splice(Profile<D> future) {
+        return new Profile<>(future.projection, this.history);
     }
 
     // Asserts at compile time that this profile is over true dynamics objects.
