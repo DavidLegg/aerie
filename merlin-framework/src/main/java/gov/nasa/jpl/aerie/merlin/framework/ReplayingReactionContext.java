@@ -8,6 +8,7 @@ import gov.nasa.jpl.aerie.merlin.protocol.model.TaskFactory;
 import gov.nasa.jpl.aerie.merlin.protocol.types.Duration;
 import gov.nasa.jpl.aerie.merlin.protocol.types.InSpan;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.mutable.MutableObject;
 
 import java.util.List;
 import java.util.Objects;
@@ -72,11 +73,16 @@ final class ReplayingReactionContext implements Context {
   }
 
   @Override
-  public <T> void call(final InSpan inSpan, final TaskFactory<T> task) {
+  public <T> T call(final InSpan inSpan, final TaskFactory<T> task) {
+    // REVIEW - this pattern for extracting the return value feels cursed.
     this.memory.doOnce(() -> {
       this.scheduler = null;  // Relinquish the current scheduler before yielding, in case an exception is thrown.
-      this.scheduler = this.handle.call(inSpan, task);
+      // When the task finishes, write the value to memory.
+      this.scheduler = this.handle.call(inSpan, task.writingTo(this.memory.memory.reads::add));
     });
+    // Then do a false "read", which will actually get the value we wrote to memory earlier,
+    // as well as update any bookkeeping to record that this value was read.
+    return this.memory.doOnce(() -> null);
   }
 
   @Override
