@@ -15,6 +15,12 @@ jar {
   } {
     exclude 'META-INF/LICENSE.txt', 'META-INF/NOTICE.txt'
   }
+
+  // The following line is necessary because fat jars are not the default.
+  // Hence we need to explicitly declare that we need these other jars,
+  // in addition to declaring we need to compile against these projects.
+  dependsOn ':streamline:jar'
+  dependsOn ':contrib:jar'
 }
 
 test {
@@ -34,8 +40,9 @@ jacocoTestReport {
 dependencies {
   annotationProcessor project(':merlin-framework-processor')
 
-  implementation project(':merlin-framework')
-  implementation project(':contrib')
+  implementation project(':streamline')
+
+  api 'org.glassfish:javax.json:1.1.4'
 
   testImplementation project(':merlin-framework-junit')
   testImplementation 'org.assertj:assertj-core:3.23.1'
